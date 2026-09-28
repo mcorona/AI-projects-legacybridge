@@ -83,3 +83,14 @@ def test_dictionary_matches_database_columns():
     in_db = {(t, c) for t, c in rows}
     documented = {(c.table, c.name) for c in load().columns()}
     assert documented == in_db
+
+
+def test_agent_facing_text_never_names_sensitive_tables():
+    """Los términos pueden reconocer 'ctrlhis', pero ningún texto que ve el agente lo revela."""
+    d = load()
+    texts = [r.text for r in d.rules.values()]
+    texts += [f"{v['title']} {v['handling']}" for v in d.defects.values()]
+    texts += [f"{c.meaning} {' '.join(c.synonyms)}" for c in d.columns()]
+    texts += [f"{t.concept} {t.description} {' '.join(t.synonyms)}" for t in d.tables.values()]
+    for text in texts:
+        assert not any(name in text.lower() for name in SENSITIVE_TABLES), text
