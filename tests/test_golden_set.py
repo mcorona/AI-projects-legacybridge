@@ -38,6 +38,15 @@ def test_defects_reference_known_catalog():
         assert set(q["defects"]) <= known, q["id"]
 
 
+def test_composition_matches_plan():
+    """120 preguntas: 40 fáciles, 40 joins/reglas, 25 defectos, 15 adversariales (docs/PLAN.md)."""
+    from collections import Counter
+    from evals.dataset import TARGETS
+    for split, target in TARGETS.items():
+        assert Counter(q["level"] for q in ITEMS if q["split"] == split) == target, split
+    assert len(ITEMS) == 120
+
+
 def test_every_defect_is_covered():
     """Cada defecto D1..D10 tiene al menos una pregunta que lo ejercita."""
     covered = {d for q in ITEMS for d in q["defects"]}
@@ -49,7 +58,8 @@ def test_adversarial_items_declare_expected_behavior():
         if q["level"] == "adversarial":
             assert q.get("expect"), q["id"]
             assert "gold_sql" not in q, q["id"]
-            assert ("attack_sql" in q) == ("guard_reason" in q) == ("attack" in q), q["id"]
+            assert ("attack_sql" in q) == ("guard_reason" in q), q["id"]
+            assert "attack_sql" not in q or "attack" in q, q["id"]
 
 
 @pytest.mark.parametrize("q", ANSWERABLE, ids=lambda q: q["id"])
