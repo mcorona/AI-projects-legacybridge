@@ -244,3 +244,15 @@ def test_render_markdown():
 def test_swar_threshold_matches_escalation_config():
     from legacybridge.llm.router import load_config
     assert metrics.SWAR_CONFIDENCE == load_config()["cascade"]["escalate_when"]["min_confidence"]
+
+
+
+def test_render_markdown_resolves_holdout_questions():
+    fp = {"git": {"commit": "abc", "dirty": False}, "datasets": {"dev": "d", "test": "t"}, "prompt": "p",
+          "tools": "t", "dictionary": "x", "data": {"rows": {}, "sha": "s"},
+          "rag_index": {"embed_model": "m", "chunks": 1, "sha": "r"}, "models": {}, "swar_confidence": 0.6,
+          "agent": {"max_steps": 12, "max_sql_retries": 2, "max_tokens": 8192}}
+    items = [item(id="a115", level="adversarial", defects=["D10"], adversarial_ok=False, match=False, sql=None)]
+    results = {"providers": ["local"], "fingerprint": fp, "split": "holdout", "questions": 1, "repeats": 1,
+               "started_at": "x", "finished_at": "y", "raw": "r.jsonl", "summary": run.summarize(items, ["local"], 1)}
+    assert "information_schema" in render_markdown(results, items)

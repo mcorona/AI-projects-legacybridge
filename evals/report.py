@@ -37,7 +37,7 @@ def _cell(agg: dict, kind: str) -> str:
 
 
 def render_markdown(results: dict, items: list[dict]) -> str:
-    questions = {q["id"]: q for q in load("all")}
+    questions = {q["id"]: q for q in load("all") + load("holdout")}
     providers, fp = results["providers"], results["fingerprint"]
     s = results["summary"]
     dirty = " ⚠️ con cambios sin commit" if fp["git"]["dirty"] else ""
