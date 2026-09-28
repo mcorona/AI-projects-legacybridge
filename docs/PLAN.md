@@ -29,9 +29,9 @@ Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL 
 - **Aceptación:** reporte markdown reproducible en `evals/reports/`.
 
 ## Fase 4 — Seguridad y guardrails (semana 4)
-- [ ] Prompt injection directa e indirecta (texto malicioso dentro de datos de la BD).
-- [ ] Enmascarado de PII en salida; Bedrock Guardrails `ApplyGuardrail` como capa opcional.
-- [ ] Human-in-the-loop para cualquier acción marcada como `write` (solo propuesta, no ejecución).
+- [x] Prompt injection directa e indirecta (texto malicioso dentro de datos de la BD).
+- [x] Enmascarado de PII en salida; Bedrock Guardrails `ApplyGuardrail` como capa opcional.
+- [x] Human-in-the-loop para cualquier acción marcada como `write` (solo propuesta, no ejecución).
 - **Aceptación:** 15/15 adversariales bloqueadas o respondidas de forma segura.
 
 ## Fase 5 — Cascada de costo y observabilidad (semana 5)

@@ -3,7 +3,7 @@
 **An AI agent that safely answers business questions over legacy enterprise databases through MCP —
 with verifiable evidence, reproducible evaluation, and a cost-aware model cascade.**
 
-> Status: ✅ Phase 0 · ✅ Phase 1 (MCP servers) · ✅ Phase 2 (RAG + agent) · ✅ Phase 3 (evaluation) · 🚧 Phase 4 — security & guardrails.
+> Status: ✅ Phases 0–4 (MCP servers, RAG + agent, evaluation, guardrails) · 🚧 Phase 5 — cost cascade & observability.
 
 ## Why
 Critical business data still lives in decades-old ERPs: cryptic table names, no foreign keys,
@@ -33,7 +33,8 @@ User ─► Agent ─► LLM router ─┬─► Qwen3.6 (LM Studio, local, $0)
 | Schema RAG in pgvector (DDL, dictionary, defects; redacted, least-privilege roles) | ✅ |
 | Golden set (120 q, dev/test split, every defect question proven to discriminate) + reproducible harness (execution accuracy, SWAR, refusals, p50/p95, cost) — ADR-005 | ✅ |
 | Deterministic synthetic ERP data with every legacy defect seeded | ✅ |
-| Prompt-injection defense (direct and indirect) | ⏳ |
+| Layered guardrails: direct/indirect prompt injection (incl. base64 and zero-width tricks), denied topics, output DLP, PII masking (Mexican formats), append-only audit log, optional Bedrock Guardrails — ADR-006 | ✅ |
+| Human-in-the-loop write proposals: validated, confirmed, reviewed — never executed | ✅ |
 | Cost cascade benchmark (local vs cloud) | ⏳ |
 
 ## Results (Phase 3, held-out test split)
@@ -48,6 +49,15 @@ Full reports with reproducibility fingerprint: [`evals/reports/`](evals/reports/
 | Sensitive-name leaks | 0% |
 | Runs completed | 84.1% |
 | Latency p50 / p95 | 16 s / 92 s |
+
+**Security (Phase 4)** — adversarial prompts, 3 runs each:
+
+| Set | Expected behavior | Safe handling | Leaks | Writes executed |
+|---|---|---|---|---|
+| 15 golden-set attacks | 80.0% | 100% | 0 | 0 |
+| 15 held-out attacks (written before the defenses) | 93.3% | 100% | 0 | 0 |
+
+With guardrails on, the test split keeps 0% false refusals (83.8% execution accuracy, single run).
 
 By level: easy 95.6% · joins & rules 73.3% · legacy-defect traps 58.3%. Hardest defects: mixed
 currencies (D7) and magic status codes (D5). Figures are after a documented measurement fix
@@ -75,6 +85,7 @@ make db-migrate && make index   # pgvector store + schema knowledge index
 make ask Q="How many active customers are there?"   # answer + evidence + trace + cost
 make seed           # deterministic synthetic data (seed 42) with every defect seeded
 make eval           # official evaluation: test split × 3 (≈ 1.5 h local); ARGS="--split dev --scratch" for quick runs
+make proposals      # human review of change proposals (the agent never executes writes)
 make mcp-dev SERVER=schema   # or SERVER=sql — MCP Inspector UI
 claude              # then run /kickoff
 ```
