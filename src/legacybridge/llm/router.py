@@ -15,6 +15,21 @@ import yaml
 CONFIG = Path(__file__).resolve().parents[3] / "config" / "models.yaml"
 _THINK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 _SQL_FENCE = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+# Motivos de paro que indican que se agotó max_tokens (OpenAI-compat / Bedrock Converse).
+TRUNCATION_STOPS = {"length", "max_tokens"}
+
+
+class EmptyCompletionError(RuntimeError):
+    """El proveedor respondió sin texto útil (p. ej. Qwen agotó max_tokens razonando).
+
+    Se trata como falla del proveedor para que la cascada escale (ver ADR-002).
+    """
+
+    def __init__(self, provider: str, stop_reason: str):
+        self.provider, self.stop_reason = provider, stop_reason
+        hint = " — sube max_tokens (el razonamiento consumió el presupuesto)" \
+            if stop_reason in TRUNCATION_STOPS else ""
+        super().__init__(f"{provider}: respuesta vacía (stop_reason={stop_reason or 'n/a'}){hint}")
 
 
 @dataclass
@@ -26,7 +41,13 @@ class LLMResult:
     output_tokens: int = 0
     latency_s: float = 0.0
     cost_usd: float = 0.0
+    stop_reason: str = ""
     attempts: list[str] = field(default_factory=list)
+
+    @property
+    def truncated(self) -> bool:
+        """True si la respuesta se cortó por max_tokens (el texto puede estar incompleto)."""
+        return self.stop_reason in TRUNCATION_STOPS
 
 
 def strip_think(text: str) -> str:
@@ -64,8 +85,9 @@ def _call_openai_compat(cfg: dict, messages: list[dict], system: str | None, **k
     r = client.chat.completions.create(model=model, messages=msgs,
                                        temperature=kw.get("temperature", 0.0),
                                        max_tokens=kw.get("max_tokens", 2048))
-    u = r.usage
-    return model, r.choices[0].message.content or "", (u.prompt_tokens if u else 0), (u.completion_tokens if u else 0)
+    u, choice = r.usage, r.choices[0]
+    return (model, choice.message.content or "", (u.prompt_tokens if u else 0),
+            (u.completion_tokens if u else 0), choice.finish_reason or "")
 
 
 def _call_bedrock(cfg: dict, messages: list[dict], system: str | None, **kw):
@@ -85,7 +107,8 @@ def _call_bedrock(cfg: dict, messages: list[dict], system: str | None, **kw):
         req["system"] = [{"text": system}]
     r = client.converse(**req)
     text = "".join(b.get("text", "") for b in r["output"]["message"]["content"])
-    return model, text, r["usage"]["inputTokens"], r["usage"]["outputTokens"]
+    return (model, text, r["usage"]["inputTokens"], r["usage"]["outputTokens"],
+            r.get("stopReason", ""))
 
 
 _BACKENDS = {"openai_compat": _call_openai_compat, "bedrock_converse": _call_bedrock}
@@ -93,24 +116,38 @@ _BACKENDS = {"openai_compat": _call_openai_compat, "bedrock_converse": _call_bed
 
 def chat(messages: list[dict], system: str | None = None, provider: str | None = None,
          **kw) -> LLMResult:
-    """Llama al proveedor indicado; con `cascade` prueba en orden hasta que uno responda."""
+    """Llama al proveedor indicado; con `cascade` prueba en orden hasta que uno responda.
+
+    - Una respuesta vacía (tras quitar `<think>`) cuenta como falla y escala al siguiente
+      proveedor (ADR-002); si no hay siguiente, lanza `RuntimeError` con el historial.
+    - Tokens, costo y latencia se acumulan en todos los intentos: es el costo real
+      de la consulta, no solo el del proveedor que respondió.
+    """
     conf = load_config()
     provider = provider or os.environ.get("LLM_PROVIDER", "local")
     order = conf["cascade"]["order"] if provider == "cascade" else [provider]
     attempts: list[str] = []
+    tin_total = tout_total = 0
+    cost_total = 0.0
+    t_start = time.perf_counter()
     last_err: Exception | None = None
     for name in order:
         cfg = conf["providers"][name]
-        t0 = time.perf_counter()
         try:
-            model, text, tin, tout = _BACKENDS[cfg["kind"]](cfg, messages, system, **kw)
+            model, text, tin, tout, stop = _BACKENDS[cfg["kind"]](cfg, messages, system, **kw)
         except Exception as e:  # noqa: BLE001 — fallback de cascada
             attempts.append(f"{name}: {type(e).__name__}")
             last_err = e
             continue
+        tin_total, tout_total = tin_total + tin, tout_total + tout
+        cost_total += _cost(cfg, tin, tout)
         if cfg.get("strip_think"):
             text = strip_think(text)
+        if not text.strip():
+            last_err = EmptyCompletionError(name, stop)
+            attempts.append(f"{name}: empty({stop or 'n/a'})")
+            continue
         attempts.append(f"{name}: ok")
-        return LLMResult(text, name, model, tin, tout, time.perf_counter() - t0,
-                         _cost(cfg, tin, tout), attempts)
+        return LLMResult(text, name, model, tin_total, tout_total,
+                         time.perf_counter() - t_start, cost_total, stop, attempts)
     raise RuntimeError(f"Todos los proveedores fallaron: {attempts}") from last_err
