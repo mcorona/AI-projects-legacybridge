@@ -108,7 +108,7 @@ class AgentResult:
 class Agent:
     def __init__(self, toolbox: ToolBox | None = None, chat_fn: ChatFn = chat,
                  provider: str | None = None, max_steps: int = 12, max_sql_retries: int = 2,
-                 max_tokens: int = 4096):
+                 max_tokens: int = 8192):   # Qwen3.x razona mucho ante peticiones dudosas (ADR-002)
         self.toolbox = toolbox or build_toolbox()
         self.chat_fn = chat_fn
         self.provider = provider
