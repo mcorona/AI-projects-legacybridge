@@ -8,9 +8,9 @@ Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL 
 - **Aceptación:** los 3 responden; Qwen sin bloques `<think>` en la salida.
 
 ## Fase 1 — MCP servers (semana 1)
-- [ ] `schema_explorer`: `list_tables`, `describe_table`, `find_columns(concept)`,
+- [x] `schema_explorer`: `list_tables`, `describe_table`, `find_columns(concept)`,
       `get_business_rule(term)` leyendo `config/business_dictionary.yaml`.
-- [ ] `sql_readonly`: `run_query(sql)` → valida con `sql_guard` → ejecuta con `lb_ro`
+- [x] `sql_readonly`: `run_query(sql)` → valida con `sql_guard` → ejecuta con `lb_ro`
       con `statement_timeout=5s` → devuelve filas + SQL normalizada.
 - [ ] Registrar ambos en `.mcp.json` y probar desde Claude Code y MCP Inspector.
 - **Aceptación:** 100% de pruebas de `tests/test_sql_guard.py`; herramientas visibles en Inspector.
