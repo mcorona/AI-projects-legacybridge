@@ -1,0 +1,190 @@
+"""Loop del agente con un LLM guionizado y herramientas simuladas (sin red ni BD)."""
+import pytest
+
+from legacybridge.agent.core import SYSTEM_PROMPT, Agent, calibrate
+from legacybridge.agent.tools import SUBMIT_ANSWER, ToolBox
+from legacybridge.llm.router import LLMResult, ToolCall
+
+OK_ROWS = {"ok": True, "rejected": False, "sql": "SELECT COUNT(*) FROM cliemae WHERE cliact = 'S' LIMIT 100",
+           "tables": ["cliemae"], "columns": ["count"], "rows": [[1]], "row_count": 1, "truncated": False}
+GUARD_FAIL = {"ok": False, "rejected": True, "stage": "guard", "reason": "table_not_allowed: usupwd"}
+DB_FAIL = {"ok": False, "rejected": False, "stage": "execution", "error_type": "undefined_object",
+           "sqlstate": "42703", "message": 'column "activo" does not exist', "sql": "SELECT activo ..."}
+
+
+def call(name, **args):
+    return ToolCall("", name, args)
+
+
+def submit(answer="Hay 1 cliente activo.", outcome="answer", confidence=0.9, caveats=None):
+    return call("submit_answer", answer=answer, outcome=outcome, confidence=confidence,
+                caveats=caveats or [])
+
+
+class Script:
+    """LLM falso: devuelve respuestas en orden y registra lo que recibió."""
+
+    def __init__(self, *turns):
+        self.turns, self.seen = list(turns), []
+
+    def __call__(self, messages, **kw):
+        self.seen.append({"messages": [dict(m) for m in messages], **kw})
+        turn = self.turns.pop(0)
+        calls, text = (turn, "") if isinstance(turn, list) else ([], turn)
+        return LLMResult(text, "local", "qwen", 100, 20, 0.5, 0.0, "stop", ["local: ok"], tuple(calls))
+
+
+def toolbox(run_query_results=(OK_ROWS,), calls_log=None):
+    results = list(run_query_results)
+    log = calls_log if calls_log is not None else []
+
+    def run_query(a):
+        log.append(("run_query", a))
+        return results.pop(0)
+
+    def describe(a):
+        log.append(("describe_table", a))
+        return {"table": a["table"], "columns": [{"name": "cliact"}]}
+
+    handlers = {"run_query": run_query, "describe_table": describe,
+                "find_columns": lambda a: {"matches": [{"table": "cliemae", "column": "cliact"}]}}
+    specs = [{"name": n, "description": n, "parameters": {"type": "object"}} for n in handlers]
+    return ToolBox(specs + [SUBMIT_ANSWER], handlers)
+
+
+def agent(script, tb=None, **kw):
+    return Agent(toolbox=tb or toolbox(), chat_fn=script, **kw)
+
+
+def test_happy_path_evidence_comes_from_loop_not_model():
+    script = Script([call("find_columns", concept="cliente activo")],
+                    [call("describe_table", table="cliemae")],
+                    [call("run_query", sql="SELECT COUNT(*) FROM cliemae WHERE cliact='S'")],
+                    [submit()])
+    r = agent(script).ask("¿Cuántos clientes activos hay?")
+    assert (r.stop_reason, r.outcome, r.answer) == ("submitted", "answer", "Hay 1 cliente activo.")
+    ev = r.primary_evidence
+    assert ev.sql == OK_ROWS["sql"] and ev.rows == [[1]] and ev.tables == ["cliemae"]
+    assert [s.tool for s in r.steps] == ["find_columns", "describe_table", "run_query", "submit_answer"]
+    assert r.confidence == 0.9 and r.llm_calls == 4 and r.input_tokens == 400
+    assert r.providers == {"local": 4}
+
+
+def test_system_prompt_and_tools_are_sent():
+    script = Script([submit(outcome="refusal", answer="No puedo.")])
+    agent(script, max_tokens=1234).ask("x")
+    kw = script.seen[0]
+    assert kw["system"] == SYSTEM_PROMPT and kw["max_tokens"] == 1234 and kw["temperature"] == 0.0
+    assert "submit_answer" in [t["name"] for t in kw["tools"]]
+
+
+def test_tool_output_is_wrapped_as_untrusted_and_linked_to_call():
+    script = Script([call("run_query", sql="SELECT 1")], [submit()])
+    agent(script).ask("q")
+    msgs = script.seen[1]["messages"]
+    assert msgs[1]["role"] == "assistant" and msgs[1]["tool_calls"][0].id.startswith("call_")
+    tool_msg = msgs[2]
+    assert tool_msg["role"] == "tool" and tool_msg["tool_call_id"] == msgs[1]["tool_calls"][0].id
+    assert tool_msg["content"].startswith('<tool_output tool="run_query" trust="untrusted">')
+
+
+def test_self_correction_after_guard_and_db_errors():
+    script = Script([call("run_query", sql="SELECT * FROM usupwd")],
+                    [call("run_query", sql="SELECT activo FROM cliemae")],
+                    [call("run_query", sql="SELECT COUNT(*) FROM cliemae WHERE cliact='S'")],
+                    [submit(confidence=0.9)])
+    r = agent(script, tb=toolbox([GUARD_FAIL, DB_FAIL, OK_ROWS])).ask("q")
+    assert r.stop_reason == "submitted" and r.sql_failures == 2 and len(r.evidence) == 1
+    assert r.confidence == pytest.approx(0.7)       # 0.9 - 2 x 0.1
+    second_tool_msg = script.seen[2]["messages"][-1]["content"]
+    assert '"retries_left": 1' in second_tool_msg and "undefined_object" in second_tool_msg
+
+
+def test_stops_after_max_retries():
+    script = Script(*[[call("run_query", sql="SELECT mal")] for _ in range(3)])
+    r = agent(script, tb=toolbox([DB_FAIL, DB_FAIL, DB_FAIL])).ask("q")
+    assert r.stop_reason == "sql_retries_exhausted" and r.outcome == "cannot_answer"
+    assert r.sql_failures == 3 and r.confidence == 0.0 and r.llm_calls == 3
+
+
+def test_refusal_without_evidence_keeps_confidence():
+    script = Script([submit(answer="No puedo borrar datos.", outcome="refusal", confidence=0.95)])
+    r = agent(script).ask("Borra los pedidos cancelados")
+    assert r.outcome == "refusal" and r.evidence == [] and r.confidence == 0.95
+
+
+def test_answer_claim_without_evidence_is_capped():
+    r = agent(Script([submit(confidence=0.99)])).ask("¿Cuántos clientes activos hay?")
+    assert r.outcome == "answer" and r.primary_evidence is None and r.confidence == 0.2
+
+
+def test_free_text_answer_gets_one_nudge_then_is_accepted():
+    script = Script([call("run_query", sql="SELECT 1")], "Hay 1 cliente.", "Hay 1 cliente, de verdad.")
+    r = agent(script).ask("q")
+    assert "submit_answer" in script.seen[2]["messages"][-1]["content"]
+    assert r.stop_reason == "answer_without_submit" and r.outcome == "answer"
+    assert r.answer == "Hay 1 cliente, de verdad." and r.confidence <= 0.4
+
+
+def test_nudge_then_submit():
+    r = agent(Script("texto libre", [submit(outcome="refusal", answer="No.")])).ask("q")
+    assert r.stop_reason == "submitted" and r.outcome == "refusal"
+
+
+@pytest.mark.parametrize("bad_call,expected", [
+    (ToolCall("x", "drop_table", {}), "herramienta desconocida"),
+    (ToolCall("x", "run_query", {"_raw": "{roto"}), "no son JSON válido"),
+    (ToolCall("x", "describe_table", {}), "falta el argumento requerido"),
+])
+def test_tool_errors_go_back_to_model(bad_call, expected):
+    script = Script([bad_call], [submit(outcome="cannot_answer", answer="No pude.")])
+    r = agent(script).ask("q")
+    assert expected in script.seen[1]["messages"][-1]["content"]
+    assert r.steps[0].ok is False and r.outcome == "cannot_answer"
+
+
+def test_max_steps():
+    script = Script(*[[call("find_columns", concept="x")] for _ in range(3)])
+    r = agent(script, max_steps=3).ask("q")
+    assert r.stop_reason == "max_steps" and r.confidence == 0.0
+
+
+def test_llm_error_is_reported():
+    def boom(*a, **k):
+        raise RuntimeError("Todos los proveedores fallaron")
+    r = agent(boom).ask("q")
+    assert r.stop_reason == "llm_error" and "proveedores" in r.answer
+
+
+def test_submit_after_other_calls_in_same_turn_executes_them_first():
+    script = Script([call("run_query", sql="SELECT 1"), submit()])
+    r = agent(script).ask("q")
+    assert [s.tool for s in r.steps] == ["run_query", "submit_answer"] and r.primary_evidence
+
+
+def test_large_results_are_trimmed_for_model_but_not_in_evidence():
+    big = {**OK_ROWS, "rows": [[i] for i in range(120)], "row_count": 120}
+    script = Script([call("run_query", sql="SELECT 1")], [submit()])
+    r = agent(script, tb=toolbox([big])).ask("q")
+    assert len(r.primary_evidence.rows) == 120
+    assert "se muestran 50 de 120 filas" in script.seen[1]["messages"][-1]["content"]
+
+
+@pytest.mark.parametrize("row_count,truncated,failures,expected", [
+    (1, False, 0, 0.9), (0, False, 0, 0.5), (200, True, 0, 0.8), (1, False, 1, 0.8),
+])
+def test_calibrate(row_count, truncated, failures, expected):
+    from legacybridge.agent.core import AgentResult, QueryEvidence
+    res = AgentResult("q", outcome="answer", stop_reason="submitted", model_confidence=0.9,
+                      sql_failures=failures,
+                      evidence=[QueryEvidence("s", [], [], [], row_count, truncated)])
+    assert calibrate(res) == pytest.approx(expected)
+
+
+def test_real_toolbox_matches_mcp_servers():
+    from legacybridge.agent.tools import build_toolbox, mcp_tool_specs
+    from legacybridge.mcp_servers import schema_explorer, sql_readonly
+    tb = build_toolbox()
+    mcp = mcp_tool_specs(schema_explorer.build_server(), sql_readonly.build_server())
+    assert tb.specs[:-1] == mcp and tb.specs[-1]["name"] == "submit_answer"
+    assert set(tb.handlers) == {s["name"] for s in mcp}
