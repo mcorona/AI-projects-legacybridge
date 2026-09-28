@@ -79,3 +79,45 @@ PostgreSQL, devuelven el año 1 a.C.; un filtro de fechas ingenuo los incluye en
 - (−) Una corrida oficial local tarda ~2 h (270 ejecuciones).
 - (−) La comparación tolerante puede aceptar una respuesta con columnas extra irrelevantes; se
   reporta también la estricta.
+
+## Resultados (2026-09-28, split test, 90 preguntas × 3, Qwen3.6-35B-A3B local)
+
+Reportes: `evals/reports/2026-09-28-test-local.md` (original) y `…-rescored.md` (corregido).
+
+| Métrica | Original | Corregido |
+|---|---|---|
+| Execution accuracy (tolerante) | 74.2 % [71.2–76.2] | **77.9 %** [75.0–80.0] |
+| Execution accuracy (estricta) | 70.4 % | 74.2 % |
+| SWAR | 9.2 % | **5.4 %** [5.0–6.2] |
+| Rechazo correcto (adversariales) | 70.0 % | 80.0 % |
+| Rechazo indebido | 0.0 % | 0.0 % |
+| Fugas | 1.1 % | 0.0 % |
+| Corridas terminadas | 84.1 % | 84.1 % |
+| Latencia p50 / p95 | 16 s / 92 s | — |
+| Costo real / equivalente Bedrock Haiku | $0 / ~$1.95 por corrida | — |
+
+Por nivel (corregido): easy 95.6 %, medium 73.3 %, defect 58.3 %. Peores defectos: D7 moneda
+(50 %, SWAR 18.8 %) y D5 pedidos válidos (54.5 %).
+
+### Corrección de medición posterior a la corrida
+El análisis de fallos encontró tres errores del **comparador**, no del agente: códigos traducidos
+a etiquetas de catálogo ('P' → 'MXN'), años numéricos vs texto, y contar como fuga un nombre que
+el propio usuario escribió. Se corrigieron con reglas generales (catálogos del diccionario,
+resueltos por columna; texto numérico = número; fuga = nombre no presente en la pregunta) y se
+re-puntuó la **misma** corrida reejecutando la SQL de evidencia guardada (`evals/rescore.py`, misma
+huella de datos, 100 % de la evidencia reproducida). Cambiaron exactamente los 4 ítems
+diagnosticados (e024, m013, m014, a010). No se modificó el agente contra test; se publican ambos
+números.
+
+### Hallazgos para las fases siguientes (no ajustados contra test)
+- **Corridas sin terminar (16 %)**, la mayor pérdida:
+  - razonamiento desbocado del modelo local, concentrado en preguntas concretas (10 fallan 3/3):
+    la cascada de la Fase 5 lo resuelve escalando;
+  - D1 en estado puro: Qwen escribe `ciedo`/`cleda`/`cledio` en lugar de `cliedo` y **repite el
+    mismo typo** en los reintentos porque el error de PostgreSQL no sugiere la columna correcta
+    (m021, m029, m038). Candidato: sugerencias "¿quisiste decir…?" en los errores de `run_query`.
+- **D7/D5 (SWAR)**: promedios que mezclan monedas (d015); "vendido" no se asocia a la regla de
+  ventas válidas (d014).
+- **Contrato de evidencia**: si el agente ejecuta una consulta de verificación después de la
+  respuesta, la evidencia principal (última consulta) no es la que respondió (m034).
+- **Adversariales**: a008 responde en lugar de negarse; a015 se queda razonando (Fase 4).

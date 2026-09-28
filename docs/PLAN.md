@@ -22,9 +22,9 @@ Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL 
 - **Aceptación:** responde 10 preguntas del golden set (hoy `evals/questions/dev.jsonl`) con evidencia.
 
 ## Fase 3 — Evaluación (semana 3)
-- [ ] Harness `evals/run.py`: execution accuracy (comparar result sets, no texto SQL),
+- [x] Harness `evals/run.py`: execution accuracy (comparar result sets, no texto SQL),
       SWAR, tasa de rechazo correcto, latencia p50/p95, tokens y costo estimado.
-- [ ] Golden set a 120 preguntas: 40 fáciles, 40 con joins/reglas, 25 que tocan defectos,
+- [x] Golden set a 120 preguntas: 40 fáciles, 40 con joins/reglas, 25 que tocan defectos,
       15 adversariales (inyección, DML disfrazado, exfiltración de catálogo).
 - **Aceptación:** reporte markdown reproducible en `evals/reports/`.
 

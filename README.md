@@ -3,7 +3,7 @@
 **An AI agent that safely answers business questions over legacy enterprise databases through MCP —
 with verifiable evidence, reproducible evaluation, and a cost-aware model cascade.**
 
-> Status: ✅ Phase 0 · ✅ Phase 1 (MCP servers) · ✅ Phase 2 (RAG + agent) · 🚧 Phase 3 — evaluation harness.
+> Status: ✅ Phase 0 · ✅ Phase 1 (MCP servers) · ✅ Phase 2 (RAG + agent) · ✅ Phase 3 (evaluation) · 🚧 Phase 4 — security & guardrails.
 
 ## Why
 Critical business data still lives in decades-old ERPs: cryptic table names, no foreign keys,
@@ -31,9 +31,27 @@ User ─► Agent ─► LLM router ─┬─► Qwen3.6 (LM Studio, local, $0)
 | Legacy defect catalog (10 intentional defects) | ✅ |
 | Agent with self-correction and loop-recorded evidence (local Qwen: 10/11 golden answers correct) — ADR-004 | ✅ |
 | Schema RAG in pgvector (DDL, dictionary, defects; redacted, least-privilege roles) | ✅ |
-| Golden set (21/120 q, D1–D10 covered; attacks verified against the guard) + execution accuracy / SWAR | 🧪 |
+| Golden set (120 q, dev/test split, every defect question proven to discriminate) + reproducible harness (execution accuracy, SWAR, refusals, p50/p95, cost) — ADR-005 | ✅ |
+| Deterministic synthetic ERP data with every legacy defect seeded | ✅ |
 | Prompt-injection defense (direct and indirect) | ⏳ |
 | Cost cascade benchmark (local vs cloud) | ⏳ |
+
+## Results (Phase 3, held-out test split)
+90 questions × 3 runs, local Qwen3.6-35B-A3B on LM Studio, $0 (≈ $1.95 per run at Bedrock Haiku prices).
+Full reports with reproducibility fingerprint: [`evals/reports/`](evals/reports/).
+
+| Metric | Value |
+|---|---|
+| Execution accuracy (result sets, not SQL text) | **77.9%** [75.0–80.0] |
+| SWAR — silent wrong answers (wrong, delivered with confidence ≥ 0.6) | **5.4%** [5.0–6.2] |
+| Correct refusals on adversarial prompts / false refusals | 80% / 0% |
+| Sensitive-name leaks | 0% |
+| Runs completed | 84.1% |
+| Latency p50 / p95 | 16 s / 92 s |
+
+By level: easy 95.6% · joins & rules 73.3% · legacy-defect traps 58.3%. Hardest defects: mixed
+currencies (D7) and magic status codes (D5). Figures are after a documented measurement fix
+(original run: 74.2% / 9.2% SWAR); see ADR-005.
 
 ## MCP tools
 | Server | Tool | Purpose |
@@ -55,7 +73,8 @@ make smoke          # needs LM Studio server on :1234 and/or OmniRoute on :20128
 make mcp-check      # lists both MCP servers' tools (MCP Inspector CLI)
 make db-migrate && make index   # pgvector store + schema knowledge index
 make ask Q="How many active customers are there?"   # answer + evidence + trace + cost
-make agent-check    # agent on the golden set (result-set comparison)
+make seed           # deterministic synthetic data (seed 42) with every defect seeded
+make eval           # official evaluation: test split × 3 (≈ 1.5 h local); ARGS="--split dev --scratch" for quick runs
 make mcp-dev SERVER=schema   # or SERVER=sql — MCP Inspector UI
 claude              # then run /kickoff
 ```
