@@ -19,7 +19,7 @@ from legacybridge.llm.messages import (ToolCall, from_converse_output, from_open
                                        to_openai_messages, to_openai_tools)
 
 __all__ = ["ToolCall", "LLMResult", "EmbedResult", "EmptyCompletionError", "chat", "embed",
-           "strip_think", "extract_sql"]
+           "embed_model_id", "strip_think", "extract_sql"]
 
 CONFIG = Path(__file__).resolve().parents[3] / "config" / "models.yaml"
 _THINK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
@@ -229,15 +229,25 @@ def _embed_bedrock_titan(cfg: dict, texts: list[str]) -> tuple[str, list[list[fl
 _EMBED_BACKENDS = {"openai_compat": _embed_openai_compat, "bedrock_titan": _embed_bedrock_titan}
 
 
+def _embed_provider(provider: str | None) -> tuple[str, dict]:
+    conf = load_config()["embeddings"]
+    name = provider or os.environ.get("EMBED_PROVIDER") or conf["default"]
+    return name, conf["providers"][name]
+
+
+def embed_model_id(provider: str | None = None) -> str:
+    """Id del espacio vectorial que usará `embed()` (sin llamar al modelo)."""
+    name, cfg = _embed_provider(provider)
+    return f"{name}:{os.environ[cfg['model_env']]}"
+
+
 def embed(texts: list[str], provider: str | None = None) -> EmbedResult:
     """Embeddings con un proveedor FIJO (sin cascada: un índice no puede mezclar modelos).
 
     Proveedor: argumento, `EMBED_PROVIDER` o `embeddings.default` de config/models.yaml.
     Verifica que la dimensión coincida con la configurada (la columna vector(N) del índice).
     """
-    conf = load_config()["embeddings"]
-    name = provider or os.environ.get("EMBED_PROVIDER") or conf["default"]
-    cfg = conf["providers"][name]
+    name, cfg = _embed_provider(provider)
     if not texts:
         return EmbedResult([], name, os.environ.get(cfg["model_env"], ""))
     t0 = time.perf_counter()

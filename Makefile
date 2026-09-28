@@ -1,4 +1,4 @@
-.PHONY: setup db db-migrate test test-unit mcp-dev mcp-check smoke eval
+.PHONY: setup db db-migrate index test test-unit mcp-dev mcp-check smoke eval
 
 setup:
 	python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -19,6 +19,10 @@ test:
 
 test-unit:      # sin Postgres
 	. .venv/bin/activate && python -m pytest -q -m "not integration"
+
+# Indexa DDL, diccionario y defectos en pgvector (incremental). ARGS="--dry-run" para previsualizar.
+index:
+	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m legacybridge.rag.index $(ARGS)
 
 smoke:
 	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.smoke_llm $(ARGS)
