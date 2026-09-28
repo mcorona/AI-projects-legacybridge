@@ -109,6 +109,8 @@ class AgentResult:
     cost_usd: float = 0.0
     latency_s: float = 0.0
     providers: dict[str, int] = field(default_factory=dict)
+    llm_trace: list[dict] = field(default_factory=list)   # una entrada por llamada al LLM (telemetría)
+    guardrail_s: float = 0.0
     guardrail_findings: list[str] = field(default_factory=list)
     pending: ProposalPreview | None = None     # propuesta de cambio esperando confirmación humana
     proposal_id: int | None = None
@@ -138,11 +140,15 @@ class Agent:
                  provider: str | None = None, max_steps: int = 12, max_sql_retries: int = 2,
                  max_tokens: int = 8192,   # Qwen3.x razona mucho ante peticiones dudosas (ADR-002)
                  guardrails: GuardrailPipeline | None = None, proposals: ProposalStore | None = None,
-                 user: str = "usuario"):
+                 user: str = "usuario", telemetry="env"):
         # seguro por defecto: sin pipeline explícito se usan los guardrails configurados en el entorno
         self.guardrails = guardrails if guardrails is not None else GuardrailPipeline.from_env()
         self.proposals = proposals if proposals is not None else DbProposalStore()
         self.user = user
+        if telemetry == "env":          # por defecto, LB_TELEMETRY_PATH; None la desactiva
+            from legacybridge.telemetry import sink_from_env
+            telemetry = sink_from_env()
+        self.telemetry = telemetry
         self.toolbox = toolbox or build_toolbox()
         self.chat_fn = chat_fn
         self.provider = provider
@@ -154,7 +160,9 @@ class Agent:
     def ask(self, question: str) -> AgentResult:
         t0 = time.perf_counter()
         res = AgentResult(question=question)
+        tg = time.perf_counter()
         decision = self.guardrails.check_input(question)
+        res.guardrail_s += time.perf_counter() - tg
         res.guardrail_findings += decision.findings
         if decision.action == BLOCK:
             res.answer, res.outcome, res.stop_reason = decision.message, "refusal", "blocked_input"
@@ -282,7 +290,9 @@ class Agent:
                 res.sql_failures += 1
                 out = {**out, "retries_left": max(0, self.max_sql_retries - res.sql_failures + 1)}
         # D9: el modelo nunca ve instrucciones incrustadas en los datos (la evidencia interna sí las conserva)
+        tg = time.perf_counter()
         out, findings = self.guardrails.sanitize_tool_result(call.name, out)
+        res.guardrail_s += time.perf_counter() - tg
         res.guardrail_findings += findings
         res.steps.append(Step(call.name, call.arguments, ok, round((time.perf_counter() - t) * 1000, 1),
                               _summary(call.name, out) + (f" · {len(findings)} retirado(s)" if findings else "")))
@@ -316,17 +326,26 @@ class Agent:
         res.output_tokens += r.output_tokens
         res.cost_usd += r.cost_usd
         res.providers[r.provider] = res.providers.get(r.provider, 0) + 1
+        res.llm_trace.append({"provider": r.provider, "model": r.model, "input_tokens": r.input_tokens,
+                              "output_tokens": r.output_tokens, "latency_s": round(r.latency_s, 3),
+                              "cost_usd": round(r.cost_usd, 6), "stop_reason": r.stop_reason,
+                              "attempts": list(r.attempts)})
 
     def _finish(self, res: AgentResult, t0: float) -> AgentResult:
         if res.stop_reason != "submitted":
             res.confidence = calibrate(res)
+        tg = time.perf_counter()
         out = self.guardrails.check_output(res.answer)
         res.answer, res.guardrail_findings = out.text, res.guardrail_findings + out.findings
         res.caveats = [self.guardrails.check_output(c).text for c in res.caveats]
         res.public_evidence = [QueryEvidence(e.sql, e.tables, e.columns,
                                              [[self._mask(v) for v in row] for row in e.rows],
                                              e.row_count, e.truncated) for e in res.evidence]
+        res.guardrail_s = round(res.guardrail_s + time.perf_counter() - tg, 4)
         res.latency_s = round(time.perf_counter() - t0, 3)
+        if self.telemetry is not None:
+            from legacybridge.telemetry import turn_record
+            self.telemetry.write(turn_record(res, provider=self.provider))
         return res
 
     def _mask(self, value):

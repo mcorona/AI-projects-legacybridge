@@ -58,6 +58,7 @@ def toolbox(run_query_results=(OK_ROWS,), calls_log=None):
 def agent(script, tb=None, **kw):
     kw.setdefault("guardrails", GuardrailPipeline(audit=ListAuditSink()))   # sin escribir en la BD
     kw.setdefault("proposals", ListProposalStore())
+    kw.setdefault("telemetry", None)
     return Agent(toolbox=tb or toolbox(), chat_fn=script, **kw)
 
 
@@ -296,3 +297,22 @@ def test_invalid_proposal_returns_to_model_and_it_refuses(sql, reason):
     r = agent(script, proposals=store).ask("haz el cambio")
     assert reason in script.seen[1]["messages"][-1]["content"]
     assert (r.outcome, r.pending, store.items) == ("refusal", None, [])
+
+
+
+# ---------------------------------------------------------------- telemetría (Fase 5)
+
+def test_telemetry_record_has_breakdown_and_no_question_text():
+    from legacybridge.telemetry import ListTelemetrySink, summarize
+    sink = ListTelemetrySink()
+    script = Script([call("run_query", sql="SELECT 1")], [submit()])
+    r = agent(script, telemetry=sink).ask("¿Cuántos clientes activos hay? RFC PELJ800101AB1")
+    rec = sink.records[0]
+    assert "PELJ800101AB1" not in str(rec) and "clientes activos" not in str(rec)
+    assert len(rec["question_sha"]) == 16 and rec["outcome"] == "answer"
+    assert [c["provider"] for c in rec["llm_calls"]] == ["local", "local"]
+    assert set(rec["latency_breakdown_s"]) == {"llm", "tools", "guardrails", "other"}
+    assert rec["tools"][0]["tool"] == "run_query" and rec["input_tokens"] == r.input_tokens
+    assert rec["cost_bedrock_equiv_usd"] == pytest.approx((200 * 1.10 + 40 * 5.50) / 1e6)
+    s = summarize(sink.records)
+    assert s["turns"] == 1 and s["outcomes"] == {"answer": 1} and s["providers_calls"] == {"local": 2}

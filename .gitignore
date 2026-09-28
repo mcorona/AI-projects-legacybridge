@@ -5,3 +5,5 @@ __pycache__/
 evals/reports/scratch/
 evals/results/
 .pytest_cache/
+# telemetría local (no versionada)
+var/

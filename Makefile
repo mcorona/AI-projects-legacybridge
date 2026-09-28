@@ -1,4 +1,4 @@
-.PHONY: setup db db-migrate seed index ask proposals agent-check rescore test test-unit mcp-dev mcp-check smoke eval
+.PHONY: setup db db-migrate seed index ask proposals telemetry agent-check rescore test test-unit mcp-dev mcp-check smoke eval
 
 setup:
 	python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -36,6 +36,10 @@ ask:
 # Revisión humana de propuestas de cambio (nunca se ejecutan): make proposals [ARGS="approve 3 --reviewer Ana"]
 proposals:
 	@. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m legacybridge.agent.review_cli $(if $(ARGS),$(ARGS),list)
+
+# Resumen de la telemetría por turno (latencia por etapa, costo, escalamientos, guardrails)
+telemetry:
+	@. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m legacybridge.telemetry summary
 
 # Re-puntúa una corrida con las reglas vigentes sin volver a correr el agente: make rescore R=evals/reports/<...>.json
 rescore:

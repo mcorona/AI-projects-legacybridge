@@ -153,7 +153,7 @@ def make_agent(provider: str):
     from legacybridge.guardrails.audit import ListAuditSink
 
     return Agent(provider=provider, guardrails=GuardrailPipeline.from_env(audit=ListAuditSink()),
-                 proposals=ListProposalStore(), user="evals")
+                 proposals=ListProposalStore(), user="evals", telemetry=None)   # el harness tiene su JSONL
 
 
 def evaluate(questions: list[dict], providers: list[str], repeats: int, raw_path: Path) -> list[dict]:
