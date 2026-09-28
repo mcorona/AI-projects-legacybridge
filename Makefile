@@ -53,5 +53,9 @@ mcp-check:
 	  | python3 -c "import sys,json; print([t['name'] for t in json.load(sys.stdin)['tools']])" || exit 1; \
 	done
 
+# Evaluación reproducible (Fase 3). Oficial: split test, Qwen local, 3 repeticiones.
+#   make eval ARGS="--split dev -p local --scratch"      corrida de trabajo
+#   make eval ARGS="--resume evals/results/raw/<id>.jsonl"   continuar una corrida cortada
+EVAL_ARGS ?= --split test -p local --repeats 3
 eval:
-	@echo "Fase 3: implementar evals/run.py"
+	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m evals.run $(if $(ARGS),$(ARGS),$(EVAL_ARGS))

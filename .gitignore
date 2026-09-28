@@ -1,5 +1,7 @@
 .venv/
 __pycache__/
 .env
-evals/reports/*.md
+# Reportes oficiales (evals/reports/*.md|json) se versionan; los de trabajo y los crudos no
+evals/reports/scratch/
+evals/results/
 .pytest_cache/
