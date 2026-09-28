@@ -34,7 +34,14 @@ FORBIDDEN_FUNCS = {
     "cursor_to_xml", "cursor_to_xmlschema", "schema_to_xml", "database_to_xml",
     # introspección de privilegios / catálogo por nombre
     "to_regclass", "has_table_privilege", "has_column_privilege", "has_schema_privilege",
+    # huella del servidor y de la sesión (sqlglot las tipa, así que requieren denylist explícita)
+    "current_version", "version", "current_user", "session_user", "current_role", "current_database",
+    "current_catalog", "current_schema", "current_schemas", "inet_server_addr", "inet_server_port",
+    "inet_client_addr", "pg_backend_pid",
 }
+# Palabras clave SQL que PostgreSQL evalúa como funciones aunque sqlglot las lea como columnas.
+SESSION_KEYWORDS = {"user", "current_user", "session_user", "current_role", "current_catalog",
+                    "current_schema"}
 # Funciones de Postgres que sqlglot no tipa y que son legítimas en consultas analíticas.
 ALLOWED_ANON_FUNCS = {
     # fechas
@@ -108,6 +115,8 @@ def validate(sql: str, allowed_tables: set[str], max_limit: int = 200,
             return GuardResult(False, reason="locking_clause")
         if isinstance(node, exp.Func) and (why := _check_function(node)):
             return GuardResult(False, reason=why)
+        if isinstance(node, exp.Column) and not node.table and node.name.lower() in SESSION_KEYWORDS:
+            return GuardResult(False, reason=f"forbidden_function: {node.name.lower()}")
 
     cte_names = {c.alias_or_name.lower() for c in tree.find_all(exp.CTE)}
     tables = []

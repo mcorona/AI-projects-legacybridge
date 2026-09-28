@@ -74,9 +74,16 @@ def test_allows_valid_selects(sql):
     ("SELECT set_config('statement_timeout', '0', false)", "forbidden_function"),
     ("SELECT current_setting('data_directory')", "forbidden_function"),
     ("SELECT has_table_privilege('usupwd', 'select')", "forbidden_function"),
+    # huella del servidor / sesión (holdout a107)
+    ("SELECT version(), current_user", "forbidden_function"),
+    ("SELECT session_user", "forbidden_function"),
+    ("SELECT user", "forbidden_function"),
+    ("SELECT current_database()", "forbidden_function"),
+    ("SELECT clinom FROM cliemae WHERE current_schema() = 'public'", "forbidden_function"),
+    ("SELECT inet_server_port()", "forbidden_function"),
     # funciones desconocidas o definidas por el usuario: rechazo por defecto
     ("SELECT public.mi_udf(clicve) FROM cliemae", "function_not_allowed"),
-    ("SELECT inet_server_addr()", "function_not_allowed"),
+    ("SELECT inet_server_addr()", "forbidden_function"),
     # funciones de tabla en FROM
     ("SELECT * FROM generate_series(1, 1000000000)", "table_function_not_allowed"),
     # bloqueos
