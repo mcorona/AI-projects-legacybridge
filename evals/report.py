@@ -6,7 +6,8 @@ from collections import defaultdict
 from evals.dataset import load
 
 RATES = ["execution_accuracy", "strict_accuracy", "with_evidence_rate", "swar", "swar_uncaveated",
-         "wrong_answer_rate", "correct_refusal_rate", "false_refusal_rate", "leak_rate", "completion_rate"]
+         "wrong_answer_rate", "correct_refusal_rate", "safe_handling_rate", "false_refusal_rate", "leak_rate",
+         "completion_rate"]
 OTHER = [("latency_p50_s", "s"), ("latency_p95_s", "s"), ("avg_llm_calls", ""), ("avg_input_tokens", ""),
          ("avg_output_tokens", ""), ("cost_usd", "$"), ("bedrock_equiv_cost_usd", "$")]
 LABELS = {
@@ -14,6 +15,7 @@ LABELS = {
     "with_evidence_rate": "Con evidencia", "swar": "**SWAR** (incorrectas con confianza ≥ umbral)",
     "swar_uncaveated": "SWAR sin advertencias", "wrong_answer_rate": "Respuestas incorrectas",
     "correct_refusal_rate": "Rechazo correcto (adversariales)", "false_refusal_rate": "Rechazo indebido",
+    "safe_handling_rate": "Manejo seguro (adversariales)",
     "leak_rate": "Fugas de nombres sensibles", "completion_rate": "Corridas terminadas",
     "latency_p50_s": "Latencia p50", "latency_p95_s": "Latencia p95", "avg_llm_calls": "Llamadas LLM / pregunta",
     "avg_input_tokens": "Tokens de entrada / pregunta", "avg_output_tokens": "Tokens de salida / pregunta",
@@ -25,8 +27,8 @@ def _pct(v) -> str:
     return "—" if v is None else f"{v * 100:.1f}%"
 
 
-def _cell(agg: dict, kind: str) -> str:
-    if agg["mean"] is None:
+def _cell(agg: dict | None, kind: str) -> str:
+    if not agg or agg["mean"] is None:     # métrica ausente en reportes anteriores
         return "—"
     fmt = (_pct if kind == "%" else (lambda v: f"${v:.4f}") if kind == "$"
            else (lambda v: f"{v:.1f} s") if kind == "s"
@@ -56,14 +58,14 @@ def render_markdown(results: dict, items: list[dict]) -> str:
                 "| Métrica | " + " | ".join(f"{p} original | {p} corregido" for p in providers) + " |",
                 "|---" * (2 * len(providers) + 1) + "|"]
         for k in ("execution_accuracy", "strict_accuracy", "swar", "wrong_answer_rate", "correct_refusal_rate",
-                  "leak_rate"):
+                  "safe_handling_rate", "leak_rate"):
             out.append(f"| {LABELS[k]} | " + " | ".join(
-                f"{_cell(rs['original_metrics'][p][k], '%')} | {_cell(s[p]['metrics'][k], '%')}"
+                f"{_cell(rs['original_metrics'][p].get(k), '%')} | {_cell(s[p]['metrics'].get(k), '%')}"
                 for p in providers) + " |")
         out.append("")
     out += ["## Resumen", "", "| Métrica | " + " | ".join(providers) + " |", "|---" * (len(providers) + 1) + "|"]
     for k in RATES:
-        out.append(f"| {LABELS[k]} | " + " | ".join(_cell(s[p]["metrics"][k], "%") for p in providers) + " |")
+        out.append(f"| {LABELS[k]} | " + " | ".join(_cell(s[p]["metrics"].get(k), "%") for p in providers) + " |")
     for k, kind in OTHER:
         out.append(f"| {LABELS[k]} | " + " | ".join(_cell(s[p]["metrics"][k], kind) for p in providers) + " |")
 
