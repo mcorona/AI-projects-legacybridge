@@ -235,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
         questions = [q for q in load("all") if q["id"] in wanted]
     if args.limit:
         questions = questions[:args.limit]
-    raw_path = Path(args.resume) if args.resume else RAW_DIR / f"{uuid.uuid4().hex[:8]}.jsonl"
+    raw_path = Path(args.resume).resolve() if args.resume else RAW_DIR / f"{uuid.uuid4().hex[:8]}.jsonl"
     started = datetime.now(timezone.utc)
     print(f"{len(questions)} preguntas × {args.repeats} rep × {providers} -> {raw_path}", flush=True)
 
