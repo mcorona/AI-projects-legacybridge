@@ -3,7 +3,7 @@
 Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL guard).
 
 ## Fase 0 — Arranque (día 1)
-- [ ] `make setup && make db && make test` en verde.
+- [x] `make setup && make db && make test` en verde.
 - [ ] Smoke test de los tres proveedores: `python -m scripts.smoke_llm --provider local|omniroute|bedrock`.
 - **Aceptación:** los 3 responden; Qwen sin bloques `<think>` en la salida.
 
