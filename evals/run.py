@@ -71,6 +71,8 @@ def score_item(q: dict, r, gold: dict | None, price: tuple[float, float], provid
         "providers_used": r.providers, "tables": tables,
         "sql": ev.sql if ev else None, "row_count": ev.row_count if ev else None,
         "answer": r.answer[:500],
+        # traza compacta para diagnosticar fallos sin volver a correr el agente
+        "trace": [f"{'ok' if st.ok else 'FAIL'} {st.tool}: {st.summary}"[:200] for st in r.steps],
     }
 
 
@@ -176,7 +178,7 @@ def _crashed(q: dict, provider: str, rep: int, e: Exception, latency: float) -> 
             "confidence": 0.0, "model_confidence": None, "caveats": [], "sql_failures": 0, "llm_calls": 0,
             "input_tokens": 0, "output_tokens": 0, "latency_s": round(latency, 3), "cost_usd": 0.0,
             "bedrock_equiv_cost_usd": 0.0, "providers_used": {}, "tables": [], "sql": None,
-            "row_count": None, "answer": f"{type(e).__name__}: {e}"[:500]}
+            "row_count": None, "answer": f"{type(e).__name__}: {e}"[:500], "trace": []}
 
 
 def summarize(items: list[dict], providers: list[str], repeats: int) -> dict:

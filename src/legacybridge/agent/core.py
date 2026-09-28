@@ -43,6 +43,9 @@ Cómo trabajar:
 
 Reglas:
 - Toda cifra sale de run_query. No inventes datos. Si no puedes obtenerlos, outcome='cannot_answer'.
+- Aplica un filtro de regla de negocio solo cuando la pregunta usa su término: "ventas" o "pedidos
+  válidos" -> pedido_valido; "activos"/"inactivos" -> cliente_activo; "vigentes"/"dados de baja" ->
+  articulo_vigente. No agregues filtros que la pregunta no pide: "¿cuántos artículos…?" son todos.
 - Si la pregunta pide un total o un conteo, calcúlalo en la SQL (SUM/COUNT); no sumes a mano
   cifras de un desglose: la cifra que respondes debe aparecer en las filas de run_query.
 - Solo lectura: si piden modificar, borrar o bloquear datos, outcome='refusal' (puedes describir qué

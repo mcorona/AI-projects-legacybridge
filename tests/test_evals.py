@@ -126,6 +126,7 @@ def test_score_item_match_and_bedrock_equivalent_cost():
     it = run.score_item(Q, agent_result([[1]]), GOLD, (1.0, 5.0), "local", 1)
     assert it["match"] and it["match_strict"] and it["finished"] and it["has_evidence"]
     assert it["bedrock_equiv_cost_usd"] == pytest.approx(0.003)
+    assert it["trace"] == []
     json.dumps(it)   # serializable al JSONL crudo
 
 

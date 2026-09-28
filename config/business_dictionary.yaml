@@ -105,6 +105,8 @@ rules:
 catalogs:
   artlin: {FE: Ferretería, LA: Lámina, SO: Soldadura}
   almcve: {"01": Guadalajara, "02": Monterrey, "03": Querétaro}
+  cliedo: {AGS: Aguascalientes, CDMX: Ciudad de México, COA: Coahuila, GTO: Guanajuato, JAL: Jalisco,
+           MEX: Estado de México, NLE: Nuevo León, PUE: Puebla, QRO: Querétaro, SLP: San Luis Potosí}
   pedest: {A: Abierto, C: Cerrado, X: Cancelado, Z: Migrado 1998 (no usar)}
   pedmon: {P: MXN, D: USD}
   artuni: {PZA: Pieza, CJA: Caja (artfac piezas), KG: Kilogramo}
