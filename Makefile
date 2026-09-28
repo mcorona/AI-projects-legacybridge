@@ -11,7 +11,7 @@ test:
 	. .venv/bin/activate && python -m pytest -q
 
 smoke:
-	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.smoke_llm
+	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.smoke_llm $(ARGS)
 
 mcp-dev:
 	npx @modelcontextprotocol/inspector .venv/bin/python src/legacybridge/mcp_servers/sql_readonly.py
