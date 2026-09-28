@@ -19,7 +19,7 @@ from legacybridge.llm.messages import (ToolCall, from_converse_output, from_open
                                        to_openai_messages, to_openai_tools)
 
 __all__ = ["ToolCall", "LLMResult", "EmbedResult", "EmptyCompletionError", "chat", "embed",
-           "embed_model_id", "strip_think", "extract_sql"]
+           "embed_model_id", "bedrock_runtime_client", "strip_think", "extract_sql"]
 
 CONFIG = Path(__file__).resolve().parents[3] / "config" / "models.yaml"
 _THINK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
@@ -109,6 +109,12 @@ def _bedrock_client():
     # Reintentos adaptativos: absorben ThrottlingException sin escalar en falso.
     return session.client("bedrock-runtime",
                           config=Config(retries={"max_attempts": 5, "mode": "adaptive"}))
+
+
+def bedrock_runtime_client():
+    """Cliente `bedrock-runtime` (perfil/región del entorno) para capas que no son chat, como
+    Bedrock Guardrails: así ningún módulo fuera de `llm/` importa el SDK del proveedor."""
+    return _bedrock_client()
 
 
 def _call_openai_compat(cfg: dict, messages: list[dict], system: str | None,
