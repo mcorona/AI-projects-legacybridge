@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import base64
 import datetime as dt
+import difflib
 import os
+import re
 import time
 import uuid
 from decimal import Decimal
@@ -72,6 +74,8 @@ class ReadOnlyExecutor:
         out = self._execute(g.sql, max_rows)
         if out["ok"]:
             out["tables"] = list(g.tables)
+        elif out.get("stage") == "execution" and (hint := name_hints(out.get("message", ""), g.tables)):
+            out.update(hint)
         return out
 
     def _execute(self, sql: str, max_rows: int) -> dict:
@@ -109,6 +113,38 @@ class ReadOnlyExecutor:
         return {"ok": True, "rejected": False, "sql": sql, "columns": columns, "rows": rows,
                 "row_count": len(rows), "truncated": len(rows) >= max_rows,
                 "ms": round((time.perf_counter() - t0) * 1000, 1)}
+
+
+_UNDEFINED_COLUMN = re.compile(r'column "?(?:\w+\.)?"?(\w+)"? does not exist')
+_UNDEFINED_RELATION = re.compile(r'relation "?(\w+)"? does not exist')
+_AMBIGUOUS = re.compile(r'column reference "?(\w+)"? is ambiguous')
+
+
+def name_hints(message: str, tables: list[str] | tuple[str, ...]) -> dict:
+    """Sugerencias para errores de nombre (D1: los nombres crípticos invitan a typos).
+
+    Sin sugerencia, un modelo tiende a repetir el mismo nombre equivocado en cada reintento.
+    Se busca entre las columnas del diccionario de las tablas usadas por la consulta (con alias,
+    PostgreSQL no dice a qué tabla pertenece la columna)."""
+    d = load_dictionary()
+    if m := _UNDEFINED_COLUMN.search(message):
+        name = m.group(1).lower()
+        pool = {f"{c.table}.{c.name}": c.name for c in d.columns() if not tables or c.table in tables}
+        close = difflib.get_close_matches(name, list(pool.values()), n=3, cutoff=0.6)
+        suggestions = [q for q, col in pool.items() if col in close]
+        if suggestions:
+            return {"suggestions": sorted(suggestions, key=lambda q: close.index(pool[q])),
+                    "hint": f"La columna '{name}' no existe. ¿Quisiste decir {', '.join(suggestions)}?"}
+        return {"hint": f"La columna '{name}' no existe; revisa describe_table."}
+    if m := _UNDEFINED_RELATION.search(message):
+        close = difflib.get_close_matches(m.group(1).lower(), sorted(d.allowed_tables), n=2, cutoff=0.5)
+        return {"suggestions": close, "hint": "Tabla inexistente; las consultables están en list_tables."
+                + (f" ¿Quisiste decir {', '.join(close)}?" if close else "")}
+    if m := _AMBIGUOUS.search(message):
+        return {"hint": f"'{m.group(1)}' existe en varias tablas del FROM: califícala con el alias (p. ej. e.{m.group(1)})."}
+    if "specified in USING clause" in message:
+        return {"hint": "Esa columna no está en ambas tablas: usa JOIN … ON con columnas calificadas."}
+    return {}
 
 
 def _first_line(e: Exception) -> str:

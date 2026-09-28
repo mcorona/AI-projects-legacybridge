@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from legacybridge.mcp_servers.sql_readonly import MAX_ROWS, ReadOnlyExecutor, to_json_value
+from legacybridge.mcp_servers.sql_readonly import MAX_ROWS, ReadOnlyExecutor, name_hints, to_json_value
 
 DSN = os.environ.get("LB_DSN", "postgresql://lb_ro:lb_ro@localhost:5433/legacy")
 ADMIN_DSN = os.environ.get("LB_ADMIN_DSN", "postgresql://postgres:postgres@localhost:5433/legacy")
@@ -141,3 +141,31 @@ def test_preflight_refuses_privileged_session(ex):
         pytest.skip("DSN de administrador no disponible")
     assert out["ok"] is False and out["stage"] == "preflight"
     assert out["error_type"] == "unsafe_session" and "user=postgres" in out["message"]
+
+
+
+# ---------------------------------------------------------------- sugerencias de nombres (Fase 5)
+
+@pytest.mark.parametrize("message,tables,expected", [
+    ('column "ciedo" does not exist', ["cliemae"], ["cliemae.cliedo"]),
+    ("column c.cledio does not exist", ["cliemae", "pedenc"], ["cliemae.cliedo"]),
+    ("column cliemae.cleda does not exist", ["cliemae"], ["cliemae.cliedo"]),
+    ('column "ardes" does not exist', ["artmae", "peddet"], ["artmae.artdes"]),
+    ('relation "pedencs" does not exist', [], ["pedenc"]),
+])
+def test_name_hints_suggest_close_dictionary_names(message, tables, expected):
+    h = name_hints(message, tables)
+    assert h["suggestions"][:len(expected)] == expected and "¿Quisiste decir" in h["hint"]
+
+
+def test_name_hints_other_errors():
+    assert "alias" in name_hints('column reference "pednum" is ambiguous', ["pedenc", "peddet"])["hint"]
+    assert "ON" in name_hints('column "artcve" specified in USING clause does not exist in left table', [])["hint"]
+    assert name_hints('column "zzzzzz" does not exist', ["cliemae"]) == {"hint": "La columna 'zzzzzz' no existe; revisa describe_table."}
+    assert name_hints("division by zero", ["cliemae"]) == {}
+
+
+@pytest.mark.integration
+def test_run_query_returns_suggestions(ex):
+    out = ex.run("SELECT c.ciedo, COUNT(*) FROM cliemae c GROUP BY 1")
+    assert out["error_type"] == "undefined_object" and out["suggestions"] == ["cliemae.cliedo"]
