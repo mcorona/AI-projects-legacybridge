@@ -1,4 +1,4 @@
-.PHONY: setup db db-migrate index ask test test-unit mcp-dev mcp-check smoke eval
+.PHONY: setup db db-migrate index ask agent-check test test-unit mcp-dev mcp-check smoke eval
 
 setup:
 	python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -27,6 +27,10 @@ index:
 # Pregunta al agente: make ask Q="¿Cuántos clientes activos hay?" [P=local|omniroute|bedrock|cascade]
 ask:
 	@. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m legacybridge.agent $(if $(P),--provider $(P)) "$(Q)"
+
+# Fase 2: agente sobre el golden set (evidencia + result set). ARGS="--all -p local --out evals/reports/x.md"
+agent-check:
+	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.agent_check $(ARGS)
 
 smoke:
 	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.smoke_llm $(ARGS)
