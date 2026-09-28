@@ -1,4 +1,7 @@
-"""MCP server: ejecución de SQL de solo lectura, siempre validada por sql_guard."""
+"""MCP server: ejecución de SQL de solo lectura, siempre validada por sql_guard.
+
+Arranque por stdio: `python -m legacybridge.mcp_servers.sql_readonly`.
+"""
 from __future__ import annotations
 
 import os
@@ -7,17 +10,22 @@ from decimal import Decimal
 from pathlib import Path
 
 import yaml
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.types import ToolAnnotations
 
 from legacybridge.guard.sql_guard import validate
 
 ROOT = Path(__file__).resolve().parents[3]
 ALLOWED = set(yaml.safe_load((ROOT / "config" / "business_dictionary.yaml").read_text())["allowed_tables"])
 
-mcp = FastMCP("legacybridge-sql")
+INSTRUCTIONS = (
+    "Ejecuta un único SELECT sobre el ERP legacy con un rol de solo lectura. Toda SQL pasa "
+    "por un validador AST; si se rechaza, la respuesta trae `reason` para corregirla."
+)
+READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False,
+                            idempotent_hint=True, open_world_hint=False)
 
 
-@mcp.tool()
 def run_query(sql: str, max_rows: int = 100) -> dict:
     """Valida y ejecuta una consulta SELECT sobre el sistema legacy (rol de solo lectura).
 
@@ -39,5 +47,11 @@ def run_query(sql: str, max_rows: int = 100) -> dict:
             "rows": rows, "row_count": len(rows), "ms": round((time.perf_counter() - t0) * 1000, 1)}
 
 
+def build_server() -> MCPServer:
+    server = MCPServer(name="legacybridge-sql", instructions=INSTRUCTIONS)
+    server.tool(annotations=READ_ONLY)(run_query)
+    return server
+
+
 if __name__ == "__main__":
-    mcp.run()
+    build_server().run("stdio")

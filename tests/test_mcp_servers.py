@@ -1,0 +1,58 @@
+"""Contrato MCP de ambos servers, probado en memoria con `mcp.Client` (sin stdio ni BD)."""
+import json
+
+import anyio
+from mcp import Client
+
+from legacybridge.mcp_servers import schema_explorer, sql_readonly
+
+
+def _run(server, fn):
+    async def main():
+        async with Client(server) as c:
+            return await fn(c)
+    return anyio.run(main)
+
+
+def _tools(server) -> dict:
+    return {t.name: t for t in _run(server, lambda c: c.list_tools()).tools}
+
+
+def _call(server, name: str, args: dict) -> dict:
+    res = _run(server, lambda c: c.call_tool(name, args))
+    assert not res.is_error, res.content
+    assert len(res.content) == 1, "cada tool debe devolver un solo objeto JSON"
+    return json.loads(res.content[0].text)
+
+
+def _assert_read_only(tools: dict):
+    for t in tools.values():
+        a = t.annotations
+        assert a.read_only_hint and not a.destructive_hint and not a.open_world_hint, t.name
+        assert t.description, f"{t.name} sin descripción"
+
+
+def test_schema_server_exposes_read_only_tools():
+    tools = _tools(schema_explorer.build_server())
+    assert {"list_tables", "describe_table", "get_business_rule"} <= set(tools)
+    _assert_read_only(tools)
+    assert tools["describe_table"].input_schema["required"] == ["table"]
+
+
+def test_sql_server_exposes_only_run_query():
+    tools = _tools(sql_readonly.build_server())
+    assert set(tools) == {"run_query"}
+    _assert_read_only(tools)
+    assert tools["run_query"].input_schema["required"] == ["sql"]
+
+
+def test_list_tables_never_exposes_sensitive_tables():
+    out = _call(schema_explorer.build_server(), "list_tables", {})
+    names = {t["table"] for t in out["tables"]}
+    assert "cliemae" in names
+    assert not names & {"usupwd", "ctrlhis"}
+
+
+def test_run_query_rejects_without_touching_db():
+    out = _call(sql_readonly.build_server(), "run_query", {"sql": "DELETE FROM cliemae"})
+    assert out["rejected"] is True and out["reason"].startswith("not_select")
