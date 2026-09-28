@@ -3,7 +3,7 @@
 **An AI agent that safely answers business questions over legacy enterprise databases through MCP —
 with verifiable evidence, reproducible evaluation, and a cost-aware model cascade.**
 
-> Status: ✅ Phase 0 · ✅ Phase 1 (MCP servers) · 🚧 Phase 2 — RAG + agent.
+> Status: ✅ Phase 0 · ✅ Phase 1 (MCP servers) · ✅ Phase 2 (RAG + agent) · 🚧 Phase 3 — evaluation harness.
 
 ## Why
 Critical business data still lives in decades-old ERPs: cryptic table names, no foreign keys,
@@ -29,8 +29,9 @@ User ─► Agent ─► LLM router ─┬─► Qwen3.6 (LM Studio, local, $0)
 | MCP servers (schema explorer, read-only SQL) with fail-closed execution | ✅ |
 | Validated business dictionary (column semantics, rules, catalogs, defects) | ✅ |
 | Legacy defect catalog (10 intentional defects) | ✅ |
-| Agent with self-correction and evidence | ⏳ |
-| Golden set (17/120 q, D1–D10 covered; attacks verified against the guard) + execution accuracy / SWAR | 🧪 |
+| Agent with self-correction and loop-recorded evidence (local Qwen: 10/11 golden answers correct) — ADR-004 | ✅ |
+| Schema RAG in pgvector (DDL, dictionary, defects; redacted, least-privilege roles) | ✅ |
+| Golden set (21/120 q, D1–D10 covered; attacks verified against the guard) + execution accuracy / SWAR | 🧪 |
 | Prompt-injection defense (direct and indirect) | ⏳ |
 | Cost cascade benchmark (local vs cloud) | ⏳ |
 
@@ -41,6 +42,7 @@ User ─► Agent ─► LLM router ─┬─► Qwen3.6 (LM Studio, local, $0)
 | | `describe_table` | Real column types + meaning, defect tags (D1–D10), joins, rules, catalogs |
 | | `find_columns(concept)` | Maps a business concept ("order date", "currency") to ranked columns |
 | | `get_business_rule(term)` | Business rules and code catalogs ("valid order", "active customer") |
+| | `search_knowledge(query)` | Semantic search over schema knowledge (pgvector, bge-m3) |
 | `legacybridge-sql` | `run_query(sql)` | AST guard → `lb_ro` preflight → read-only txn with 5 s timeout → rows + normalized SQL |
 
 Every tool is annotated read-only. Failures return a `stage` (`guard`, `connection`,
@@ -51,6 +53,9 @@ Every tool is annotated read-only. Failures return a `stage` (`guard`, `connecti
 make setup && make db && make test
 make smoke          # needs LM Studio server on :1234 and/or OmniRoute on :20128
 make mcp-check      # lists both MCP servers' tools (MCP Inspector CLI)
+make db-migrate && make index   # pgvector store + schema knowledge index
+make ask Q="How many active customers are there?"   # answer + evidence + trace + cost
+make agent-check    # agent on the golden set (result-set comparison)
 make mcp-dev SERVER=schema   # or SERVER=sql — MCP Inspector UI
 claude              # then run /kickoff
 ```

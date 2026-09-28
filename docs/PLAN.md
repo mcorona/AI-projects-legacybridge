@@ -16,8 +16,8 @@ Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL 
 - **Aceptación:** 100% de pruebas de `tests/test_sql_guard.py`; herramientas visibles en Inspector.
 
 ## Fase 2 — RAG + agente (semana 2)
-- [ ] Indexar DDL, diccionario de negocio y `docs/LEGACY_DEFECTS.md` en pgvector (bge-m3, 1024).
-- [ ] Orquestador con tool use: plan → explorar esquema → SQL → validar → ejecutar → responder
+- [x] Indexar DDL, diccionario de negocio y `docs/LEGACY_DEFECTS.md` en pgvector (bge-m3, 1024).
+- [x] Orquestador con tool use: plan → explorar esquema → SQL → validar → ejecutar → responder
       con evidencia. Máximo 2 reintentos de autocorrección con el error del guard/DB.
 - **Aceptación:** responde 10 preguntas de `evals/questions/golden_v1.jsonl` con evidencia.
 
