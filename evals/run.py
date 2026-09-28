@@ -249,7 +249,8 @@ def main(argv: list[str] | None = None) -> int:
 
     out_dir = REPORTS_DIR / "scratch" if args.scratch or args.ids or args.limit else REPORTS_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
-    stem = f"{started:%Y-%m-%d}-{results['split']}-{'+'.join(providers)}"
+    # la hora evita que dos corridas del mismo día y split se sobrescriban (pasó en la Fase 4)
+    stem = f"{started:%Y-%m-%d-%H%M}-{results['split']}-{'+'.join(providers)}"
     (out_dir / f"{stem}.json").write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     (out_dir / f"{stem}.md").write_text(render_markdown(results, items), encoding="utf-8")
     print(f"\nReporte: {(out_dir / f'{stem}.md').relative_to(ROOT)}")
