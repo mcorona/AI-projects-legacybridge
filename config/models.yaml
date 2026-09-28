@@ -1,0 +1,28 @@
+# Precios y orden de la cascada. Actualiza precios desde la página oficial antes de publicar resultados.
+cascade:
+  order: [local, omniroute, bedrock]
+  escalate_when:
+    guard_failures: 2          # SQL rechazada dos veces por el guard
+    min_confidence: 0.6        # autoevaluación del agente
+    provider_error: true
+
+providers:
+  local:
+    kind: openai_compat
+    base_url_env: LMSTUDIO_BASE_URL
+    model_env: LMSTUDIO_CHAT_MODEL
+    cost_per_mtok: {input: 0.0, output: 0.0}
+    strip_think: true
+  omniroute:
+    kind: openai_compat
+    base_url_env: OMNIROUTE_BASE_URL
+    api_key_env: OMNIROUTE_API_KEY
+    model_env: OMNIROUTE_CHAT_MODEL
+    cost_per_mtok: {input: 0.0, output: 0.0}
+    strip_think: true
+    synthetic_data_only: true
+  bedrock:
+    kind: bedrock_converse
+    model_env: BEDROCK_CHAT_MODEL
+    cost_per_mtok: {input: 1.0, output: 5.0}   # verificar precio vigente de Haiku 4.5
+    strip_think: false

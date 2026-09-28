@@ -1,0 +1,20 @@
+services:
+  legacy-db:
+    image: pgvector/pgvector:pg16
+    container_name: legacybridge-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: legacy
+    ports:
+      - "5433:5432"
+    volumes:
+      - lbdata:/var/lib/postgresql/data
+      - ./db/legacy:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d legacy"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  lbdata:

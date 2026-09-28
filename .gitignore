@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+.env
+evals/reports/*.md
+.pytest_cache/

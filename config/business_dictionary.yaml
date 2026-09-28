@@ -1,0 +1,30 @@
+# Diccionario de negocio: traduce conceptos humanos al esquema legacy.
+# Es la "memoria institucional" que el agente consulta vía schema_explorer.get_business_rule().
+allowed_tables: [cliemae, artmae, almexi, pedenc, peddet]
+
+tables:
+  cliemae: {concept: clientes, key: clicve}
+  artmae:  {concept: artículos / productos, key: artcve}
+  almexi:  {concept: existencias por almacén, key: [almcve, artcve]}
+  pedenc:  {concept: pedidos (encabezado), key: pednum}
+  peddet:  {concept: partidas de pedido, key: [pednum, pedren]}
+
+joins:
+  - "pedenc.clicve = cliemae.clicve"
+  - "peddet.pednum = pedenc.pednum"
+  - "peddet.artcve = artmae.artcve"
+  - "almexi.artcve = artmae.artcve   -- puede haber huérfanos (D2): usar LEFT JOIN y reportarlos"
+
+rules:
+  cliente_activo: "cliact = 'S'  (NULL cuenta como inactivo)"
+  articulo_vigente: "COALESCE(artbaja,'N') = 'N'"
+  pedido_valido: "pedest IN ('A','C')  -- excluir X (cancelado) y Z (migrado 1998)"
+  fecha: "TO_DATE(<campo>, 'YYYYMMDD'); valores vacíos o '00000000' son NULL"
+  cantidad_en_piezas: "detcant * CASE WHEN artuni='CJA' THEN artfac ELSE 1 END (no aplica a KG)"
+  moneda: "pedmon 'P'=MXN 'D'=USD. No sumar montos de distinta moneda sin tipo de cambio: agrupar por moneda"
+  importe_partida: "detcant * detprec"
+  tabla_historica: "ctrlhis es una copia obsoleta de pedenc. Nunca usarla."
+
+catalogs:
+  artlin: {FE: Ferretería, LA: Lámina, SO: Soldadura}
+  almcve: {"01": Guadalajara, "02": Monterrey}

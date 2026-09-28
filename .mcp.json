@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "legacybridge-schema": {
+      "command": ".venv/bin/python",
+      "args": ["src/legacybridge/mcp_servers/schema_explorer.py"],
+      "env": {"PYTHONPATH": "src", "LB_DSN": "postgresql://lb_ro:lb_ro@localhost:5433/legacy"}
+    },
+    "legacybridge-sql": {
+      "command": ".venv/bin/python",
+      "args": ["src/legacybridge/mcp_servers/sql_readonly.py"],
+      "env": {"PYTHONPATH": "src", "LB_DSN": "postgresql://lb_ro:lb_ro@localhost:5433/legacy"}
+    }
+  }
+}
