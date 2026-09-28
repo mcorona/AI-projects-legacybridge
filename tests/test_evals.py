@@ -209,7 +209,7 @@ def test_evaluate_resumes_and_survives_agent_crash(monkeypatch, tmp_path):
         def run(self, sql, max_rows=100):
             return GOLD
 
-    monkeypatch.setattr(agent_mod, "Agent", FakeAgent)
+    monkeypatch.setattr(run, "make_agent", lambda provider: FakeAgent(provider))
     monkeypatch.setattr(sql_mod, "ReadOnlyExecutor", FakeDB)
     monkeypatch.setattr(run, "bedrock_price", lambda: (1.0, 5.0))
     qs = [{**Q, "id": "e001", "question": "ok"}, {**Q, "id": "e002", "question": "boom"}]

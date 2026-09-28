@@ -117,6 +117,9 @@ def render_markdown(results: dict, items: list[dict]) -> str:
             "| Modelos | " + ", ".join(f"{p}=`{m}`" for p, m in fp["models"].items()) + " |",
             f"| Agente | max_steps={fp['agent']['max_steps']}, reintentos SQL={fp['agent']['max_sql_retries']}, "
             f"max_tokens={fp['agent']['max_tokens']} |",
-            f"| Umbral SWAR | confianza ≥ {fp['swar_confidence']} |", "",
+            f"| Umbral SWAR | confianza ≥ {fp['swar_confidence']} |",
+            *([f"| Guardrails | `{fp['guardrails']['sha']}` · {fp['guardrails']['type']} · clasificador LLM="
+               f"{'sí' if fp['guardrails']['llm_classifier'] else 'no'} · Bedrock={'sí' if fp['guardrails']['bedrock'] else 'no'} |"]
+              if "guardrails" in fp else []), "",
             "Reproducir: `make seed && make index && make eval` con la misma huella."]
     return "\n".join(out) + "\n"

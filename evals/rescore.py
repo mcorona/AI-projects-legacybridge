@@ -20,7 +20,7 @@ from evals.compare import catalog_aliases, results_match
 from evals.dataset import load
 from evals.metrics import adversarial_ok, leaks
 from evals.report import render_markdown
-from evals.run import ROOT, fingerprint, summarize
+from evals.run import ROOT, fingerprint, make_agent, summarize
 
 RULES = ("equivalencia código/etiqueta vía catálogos del diccionario; texto numérico == número; "
          "no es fuga repetir un nombre que el usuario escribió en su pregunta")
@@ -55,7 +55,6 @@ def rescore_items(items: list[dict], questions: dict[str, dict], db, aliases) ->
 
 
 def main(argv: list[str] | None = None) -> int:
-    from legacybridge.agent import Agent
     from legacybridge.mcp_servers.sql_readonly import ReadOnlyExecutor
 
     ap = argparse.ArgumentParser(prog="evals.rescore", description=__doc__.splitlines()[0])
@@ -63,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     src = Path(args.report)
     original = json.loads(src.read_text(encoding="utf-8"))
-    current = fingerprint(original["providers"], Agent(provider=original["providers"][0]))
+    current = fingerprint(original["providers"], make_agent(original["providers"][0]))
     if current["data"]["sha"] != original["fingerprint"]["data"]["sha"]:
         print("Los datos cambiaron desde la corrida original: no se puede re-puntuar (corre `make seed`).")
         return 1

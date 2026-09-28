@@ -94,6 +94,15 @@ def _git() -> dict:
     return {"commit": run("rev-parse", "--short", "HEAD"), "dirty": bool(run("status", "--porcelain"))}
 
 
+def _guardrails_fingerprint(g) -> dict:
+    import inspect
+
+    from legacybridge.guard import sql_guard, write_guard
+    from legacybridge.guardrails import injection, pii, pipeline, secrets
+    return {"sha": _sha(*(inspect.getsource(m) for m in (injection, pii, secrets, pipeline, sql_guard, write_guard))),
+            "type": type(g).__name__, "llm_classifier": g.classifier is not None, "bedrock": g.bedrock is not None}
+
+
 def fingerprint(providers: list[str], agent) -> dict:
     """Todo lo que determina el resultado: código, prompt, tools, datos, índice y modelos."""
     import psycopg
@@ -126,14 +135,26 @@ def fingerprint(providers: list[str], agent) -> dict:
         "models": models,
         "agent": {"max_steps": agent.max_steps, "max_sql_retries": agent.max_sql_retries,
                   "max_tokens": agent.max_tokens},
+        "guardrails": _guardrails_fingerprint(agent.guardrails),
         "swar_confidence": SWAR_CONFIDENCE,
     }
 
 
 # ---------------------------------------------------------------- corrida
 
-def evaluate(questions: list[dict], providers: list[str], repeats: int, raw_path: Path) -> list[dict]:
+def make_agent(provider: str):
+    """Agente de evaluación: guardrails del entorno, pero bitácora y propuestas en memoria
+    (una evaluación no llena ops.audit_log ni registra propuestas; nunca se confirma ninguna)."""
     from legacybridge.agent import Agent
+    from legacybridge.agent.proposals import ListProposalStore
+    from legacybridge.guardrails import GuardrailPipeline
+    from legacybridge.guardrails.audit import ListAuditSink
+
+    return Agent(provider=provider, guardrails=GuardrailPipeline.from_env(audit=ListAuditSink()),
+                 proposals=ListProposalStore(), user="evals")
+
+
+def evaluate(questions: list[dict], providers: list[str], repeats: int, raw_path: Path) -> list[dict]:
     from legacybridge.mcp_servers.sql_readonly import ReadOnlyExecutor
 
     done = {}
@@ -148,7 +169,7 @@ def evaluate(questions: list[dict], providers: list[str], repeats: int, raw_path
     raw_path.parent.mkdir(parents=True, exist_ok=True)
     with raw_path.open("a", encoding="utf-8") as raw:
         for provider in providers:
-            agent = Agent(provider=provider)
+            agent = make_agent(provider)
             for rep in range(1, repeats + 1):
                 for q in questions:
                     key = (provider, rep, q["id"])
@@ -218,8 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     started = datetime.now(timezone.utc)
     print(f"{len(questions)} preguntas × {args.repeats} rep × {providers} -> {raw_path}", flush=True)
 
-    from legacybridge.agent import Agent
-    fp = fingerprint(providers, Agent(provider=providers[0]))
+    fp = fingerprint(providers, make_agent(providers[0]))
     items = evaluate(questions, providers, args.repeats, raw_path)
     results = {"started_at": started.isoformat(timespec="seconds"),
                "finished_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
