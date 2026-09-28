@@ -7,16 +7,14 @@ from __future__ import annotations
 import os
 import time
 from decimal import Decimal
-from pathlib import Path
 
-import yaml
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
+from legacybridge.dictionary import load as load_dictionary
 from legacybridge.guard.sql_guard import validate
 
-ROOT = Path(__file__).resolve().parents[3]
-ALLOWED = set(yaml.safe_load((ROOT / "config" / "business_dictionary.yaml").read_text())["allowed_tables"])
+ALLOWED = set(load_dictionary().allowed_tables)
 
 INSTRUCTIONS = (
     "Ejecuta un único SELECT sobre el ERP legacy con un rol de solo lectura. Toda SQL pasa "
