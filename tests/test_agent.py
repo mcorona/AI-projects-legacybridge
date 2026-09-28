@@ -1,8 +1,9 @@
 """Loop del agente con un LLM guionizado y herramientas simuladas (sin red ni BD)."""
 import pytest
 
-from legacybridge.agent.core import SYSTEM_PROMPT, Agent, calibrate
-from legacybridge.agent.tools import SUBMIT_ANSWER, ToolBox
+from legacybridge.agent.core import SYSTEM_PROMPT, Agent, AgentResult, calibrate
+from legacybridge.agent.proposals import ListProposalStore
+from legacybridge.agent.tools import PROPOSE_CHANGE, SUBMIT_ANSWER, ToolBox
 from legacybridge.guardrails import GuardrailPipeline, NoGuardrails
 from legacybridge.guardrails.audit import ListAuditSink
 from legacybridge.llm.router import LLMResult, ToolCall
@@ -51,11 +52,12 @@ def toolbox(run_query_results=(OK_ROWS,), calls_log=None):
     handlers = {"run_query": run_query, "describe_table": describe,
                 "find_columns": lambda a: {"matches": [{"table": "cliemae", "column": "cliact"}]}}
     specs = [{"name": n, "description": n, "parameters": {"type": "object"}} for n in handlers]
-    return ToolBox(specs + [SUBMIT_ANSWER], handlers)
+    return ToolBox(specs + [PROPOSE_CHANGE, SUBMIT_ANSWER], handlers)
 
 
 def agent(script, tb=None, **kw):
     kw.setdefault("guardrails", GuardrailPipeline(audit=ListAuditSink()))   # sin escribir en la BD
+    kw.setdefault("proposals", ListProposalStore())
     return Agent(toolbox=tb or toolbox(), chat_fn=script, **kw)
 
 
@@ -189,7 +191,7 @@ def test_real_toolbox_matches_mcp_servers():
     from legacybridge.mcp_servers import schema_explorer, sql_readonly
     tb = build_toolbox()
     mcp = mcp_tool_specs(schema_explorer.build_server(), sql_readonly.build_server())
-    assert tb.specs[:-1] == mcp and tb.specs[-1]["name"] == "submit_answer"
+    assert tb.specs[:-2] == mcp and [s["name"] for s in tb.specs[-2:]] == ["propose_change", "submit_answer"]
     assert set(tb.handlers) == {s["name"] for s in mcp}
 
 
@@ -240,3 +242,57 @@ def test_no_guardrails_baseline_passes_everything_through():
     script = Script([call("run_query", sql="SELECT 1")], [submit()])
     agent(script, tb=toolbox([INJECTED]), guardrails=NoGuardrails()).ask("q")
     assert "Nuevo rol" in script.seen[1]["messages"][-1]["content"]
+
+
+
+# ---------------------------------------------------------------- human-in-the-loop (Fase 4)
+
+COUNT_ROWS = {**OK_ROWS, "columns": ["count"], "rows": [[214]], "row_count": 1}
+
+
+def propose(sql="DELETE FROM pedenc WHERE pedest = 'X'", rationale="limpieza de cancelados"):
+    return call("propose_change", sql=sql, rationale=rationale)
+
+
+def test_valid_proposal_pauses_without_recording_or_executing():
+    store, log = ListProposalStore(), []
+    script = Script([propose()])
+    r = agent(script, tb=toolbox([COUNT_ROWS], calls_log=log), proposals=store).ask("Borra los cancelados")
+    assert (r.stop_reason, r.outcome, r.confidence) == ("confirmation_required", "proposal", 1.0)
+    assert r.pending.kind == "DELETE" and r.pending.table == "pedenc" and r.pending.affected_rows_est == 214
+    assert "No se ha ejecutado nada" in r.answer and store.items == []
+    # la única SQL que llega al ejecutor es el COUNT(*) de impacto, de solo lectura
+    assert [a["sql"].upper().startswith("SELECT COUNT(*)") for _, a in log] == [True]
+
+
+def test_confirmation_records_pending_review_and_cancel_records_nothing():
+    for approve, outcome, saved in ((True, "proposal", 1), (False, "refusal", 0)):
+        store, audit = ListProposalStore(), ListAuditSink()
+        a = agent(Script([propose()]), tb=toolbox([COUNT_ROWS]), proposals=store,
+                  guardrails=GuardrailPipeline(audit=audit))
+        r = a.resume(a.ask("Borra los cancelados"), approve=approve, user="ana")
+        assert (r.outcome, r.stop_reason, len(store.items)) == (outcome, "submitted", saved)
+        assert r.pending is None and "ejecut" in r.answer
+        events = [e["event"] for e in audit.events]
+        assert events == ["proposal_requested", "proposal_confirmed" if approve else "proposal_cancelled"]
+        if approve:
+            p = store.items[0]
+            assert (p.confirmed_by, p.preview.sql, r.proposal_id) == ("ana", "DELETE FROM pedenc WHERE pedest = 'X'", 1)
+
+
+def test_resume_without_pending_raises():
+    with pytest.raises(ValueError):
+        agent(Script()).resume(AgentResult("q"), approve=True)
+
+
+@pytest.mark.parametrize("sql,reason", [
+    ("DELETE FROM pedenc", "missing_where"),
+    ("DELETE FROM usupwd WHERE usucve = 'admin'", "table_not_allowed"),
+    ("SELECT 1; DROP TABLE artmae", "multiple_statements"),
+])
+def test_invalid_proposal_returns_to_model_and_it_refuses(sql, reason):
+    script = Script([propose(sql=sql)], [submit(answer="No puedo.", outcome="refusal")])
+    store = ListProposalStore()
+    r = agent(script, proposals=store).ask("haz el cambio")
+    assert reason in script.seen[1]["messages"][-1]["content"]
+    assert (r.outcome, r.pending, store.items) == ("refusal", None, [])

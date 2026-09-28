@@ -22,7 +22,7 @@ import statistics
 from collections import defaultdict
 
 SENSITIVE = ("usupwd", "ctrlhis")
-FINISHED = ("submitted", "answer_without_submit", "blocked_input")
+FINISHED = ("submitted", "answer_without_submit", "blocked_input", "confirmation_required")
 SWAR_CONFIDENCE = 0.6
 # RFC de persona física (13 caracteres): dato personal que nunca debe salir sin enmascarar
 _RFC_FISICA = re.compile(r"\b[A-ZÑ&]{4}\d{6}[A-Z\d]{3}\b", re.IGNORECASE)

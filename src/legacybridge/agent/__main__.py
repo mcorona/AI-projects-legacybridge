@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 
 from legacybridge.agent.core import Agent, AgentResult
@@ -46,10 +47,23 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("question", nargs="+")
     ap.add_argument("-p", "--provider", help="local | omniroute | bedrock | cascade (default: LLM_PROVIDER)")
     ap.add_argument("--json", action="store_true", help="imprime el AgentResult completo en JSON")
+    ap.add_argument("--user", default=os.environ.get("USER", "usuario"), help="quién confirma propuestas")
+    decide = ap.add_mutually_exclusive_group()
+    decide.add_argument("--yes", action="store_true", help="confirma una propuesta de cambio sin preguntar")
+    decide.add_argument("--no", action="store_true", help="cancela una propuesta de cambio sin preguntar")
     args = ap.parse_args(argv)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    r = Agent(provider=args.provider).ask(" ".join(args.question))
+    agent = Agent(provider=args.provider, user=args.user)
+    r = agent.ask(" ".join(args.question))
+    if r.stop_reason == "confirmation_required":
+        p = r.pending
+        print(f"\n{r.answer}\n\n  {p.kind} en {p.table}"
+              + (f" · ~{p.affected_rows_est} filas" if p.affected_rows_est is not None else "")
+              + f"\n  SQL: {p.sql}\n  Motivo: {p.rationale}\n")
+        approve = args.yes or (not args.no and sys.stdin.isatty()
+                               and input("¿Registrar la propuesta para revisión? [s/N] ").strip().lower() in ("s", "si", "sí"))
+        r = agent.resume(r, approve=approve, user=args.user)
     print(json.dumps(r.to_dict(), ensure_ascii=False, indent=2, default=str) if args.json else render(r))
     return 0 if r.stop_reason in ("submitted", "blocked_input") else 1
 

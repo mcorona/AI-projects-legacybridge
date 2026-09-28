@@ -39,6 +39,25 @@ SUBMIT_ANSWER = {
 }
 
 
+PROPOSE_CHANGE = {
+    "name": "propose_change",
+    "description": (
+        "Prepara una PROPUESTA de cambio de datos (un INSERT, UPDATE o DELETE) cuando el usuario pide "
+        "modificar, corregir o borrar datos. NO se ejecuta nunca: el usuario la confirma y una persona "
+        "autorizada la revisa. UPDATE/DELETE deben llevar WHERE. Solo tablas permitidas; nunca "
+        "credenciales ni tablas restringidas (esas peticiones son outcome='refusal')."),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "sql": {"type": "string", "description": "Una sola sentencia INSERT, UPDATE o DELETE (PostgreSQL)"},
+            "rationale": {"type": "string", "description": "Por qué se propone el cambio, en una frase"},
+        },
+        "required": ["sql", "rationale"],
+    },
+}
+LOOP_TOOLS = ("submit_answer", "propose_change")   # las maneja el loop del agente, no un handler
+
+
 @dataclass
 class ToolBox:
     """Especificaciones neutras + funciones in-process que las ejecutan."""
@@ -76,8 +95,8 @@ def build_toolbox(explorer: SchemaExplorer | None = None,
     }
     # WARNING: MCPServer configura el logger raíz; dentro del agente no queremos ruido INFO
     specs = mcp_tool_specs(build_schema_server(ex, log_level="WARNING"),
-                           build_sql_server(sql, log_level="WARNING")) + [SUBMIT_ANSWER]
-    missing = {s["name"] for s in specs} - set(handlers) - {"submit_answer"}
+                           build_sql_server(sql, log_level="WARNING")) + [PROPOSE_CHANGE, SUBMIT_ANSWER]
+    missing = {s["name"] for s in specs} - set(handlers) - set(LOOP_TOOLS)
     if missing:   # un tool nuevo en un MCP server sin handler en el agente
         raise RuntimeError(f"tools sin handler en el agente: {sorted(missing)}")
     return ToolBox(specs, handlers)

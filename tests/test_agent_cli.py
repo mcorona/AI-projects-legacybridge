@@ -33,7 +33,7 @@ def test_render_shows_answer_evidence_trace_and_cost():
 
 def test_main_json_and_exit_code(monkeypatch, capsys):
     class FakeAgent:
-        def __init__(self, provider=None):
+        def __init__(self, provider=None, user=None):
             assert provider == "bedrock"
 
         def ask(self, q):
