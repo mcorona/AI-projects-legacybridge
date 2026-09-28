@@ -46,8 +46,22 @@ def render_markdown(results: dict, items: list[dict]) -> str:
            f"- Commit: `{fp['git']['commit']}`{dirty}",
            f"- Preguntas: {results['questions']} × {results['repeats']} repetición(es) por proveedor",
            f"- Datos crudos: `{results['raw']}` (no versionado)", "",
-           "Valores: media de las repeticiones [mín–máx]. Definiciones en `evals/metrics.py` y ADR-005.", "",
-           "## Resumen", "", "| Métrica | " + " | ".join(providers) + " |", "|---" * (len(providers) + 1) + "|"]
+           "Valores: media de las repeticiones [mín–máx]. Definiciones en `evals/metrics.py` y ADR-005.", ""]
+    rs = results.get("rescore")
+    if rs:
+        out += [f"> **Re-puntuado** el {rs['at']} desde `{rs['from']}` sin volver a correr el agente "
+                f"(commit `{rs['rescored_with_commit']}`): se reejecutó la SQL de evidencia guardada con los mismos "
+                f"datos (misma huella). Reglas de comparación corregidas: {rs['rules']}. "
+                f"Evidencia no reproducida: {rs['evidence_rows_mismatch']}.", "",
+                "| Métrica | " + " | ".join(f"{p} original | {p} corregido" for p in providers) + " |",
+                "|---" * (2 * len(providers) + 1) + "|"]
+        for k in ("execution_accuracy", "strict_accuracy", "swar", "wrong_answer_rate", "correct_refusal_rate",
+                  "leak_rate"):
+            out.append(f"| {LABELS[k]} | " + " | ".join(
+                f"{_cell(rs['original_metrics'][p][k], '%')} | {_cell(s[p]['metrics'][k], '%')}"
+                for p in providers) + " |")
+        out.append("")
+    out += ["## Resumen", "", "| Métrica | " + " | ".join(providers) + " |", "|---" * (len(providers) + 1) + "|"]
     for k in RATES:
         out.append(f"| {LABELS[k]} | " + " | ".join(_cell(s[p]["metrics"][k], "%") for p in providers) + " |")
     for k, kind in OTHER:

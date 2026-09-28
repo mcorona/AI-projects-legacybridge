@@ -1,4 +1,4 @@
-.PHONY: setup db db-migrate seed index ask agent-check test test-unit mcp-dev mcp-check smoke eval
+.PHONY: setup db db-migrate seed index ask agent-check rescore test test-unit mcp-dev mcp-check smoke eval
 
 setup:
 	python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -33,6 +33,10 @@ ask:
 	@. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m legacybridge.agent $(if $(P),--provider $(P)) "$(Q)"
 
 # Corrida rápida de trabajo sobre dev (antes scripts/agent_check.py). ARGS extra, p. ej. ARGS="--ids e001,d003"
+# Re-puntúa una corrida con las reglas vigentes sin volver a correr el agente: make rescore R=evals/reports/<...>.json
+rescore:
+	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m evals.rescore $(R)
+
 agent-check:
 	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m evals.run --split dev -p local --scratch $(ARGS)
 

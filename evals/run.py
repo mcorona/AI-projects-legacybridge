@@ -26,10 +26,10 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from evals.compare import results_match
+from evals.compare import catalog_aliases, results_match
 from evals.dataset import QUESTIONS_DIR, load
-from evals.metrics import (SENSITIVE, SWAR_CONFIDENCE, adversarial_ok, aggregate, breakdown,
-                           item_stability, run_metrics)
+from evals.metrics import (SWAR_CONFIDENCE, adversarial_ok, aggregate, breakdown, item_stability,
+                           leaks, run_metrics)
 from evals.report import render_markdown
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,7 +45,8 @@ def bedrock_price() -> tuple[float, float]:
     return p["input"], p["output"]
 
 
-def score_item(q: dict, r, gold: dict | None, price: tuple[float, float], provider: str, repeat: int) -> dict:
+def score_item(q: dict, r, gold: dict | None, price: tuple[float, float], provider: str, repeat: int,
+               aliases=None) -> dict:
     """Registro plano de una pregunta evaluada (una línea del JSONL crudo)."""
     ev = r.primary_evidence
     tables = sorted({t for e in r.evidence for t in e.tables})
@@ -53,16 +54,17 @@ def score_item(q: dict, r, gold: dict | None, price: tuple[float, float], provid
     match = match_strict = False
     if q["level"] != "adversarial" and finished and ev is not None and gold and gold.get("ok"):
         om = bool(q.get("order_matters"))
-        match = results_match(gold["columns"], gold["rows"], ev.columns, ev.rows, om, True)
-        match_strict = match and results_match(gold["columns"], gold["rows"], ev.columns, ev.rows, om, False)
-    adv_ok = (finished and adversarial_ok(q["expect"], r.outcome, r.answer, tables)
+        match = results_match(gold["columns"], gold["rows"], ev.columns, ev.rows, om, True, aliases)
+        match_strict = match and results_match(gold["columns"], gold["rows"], ev.columns, ev.rows, om, False,
+                                               aliases)
+    adv_ok = (finished and adversarial_ok(q["expect"], r.outcome, r.answer, tables, q["question"])
               if q["level"] == "adversarial" else None)
     return {
         "id": q["id"], "split": q["split"], "level": q["level"], "defects": q["defects"],
         "provider": provider, "repeat": repeat,
         "outcome": r.outcome, "stop_reason": r.stop_reason, "finished": finished,
         "has_evidence": ev is not None, "match": match, "match_strict": match_strict,
-        "adversarial_ok": adv_ok, "leak": any(t in r.answer.lower() for t in SENSITIVE),
+        "adversarial_ok": adv_ok, "leak": leaks(r.answer, q["question"]),
         "confidence": r.confidence, "model_confidence": r.model_confidence, "caveats": r.caveats,
         "sql_failures": r.sql_failures, "llm_calls": r.llm_calls,
         "input_tokens": r.input_tokens, "output_tokens": r.output_tokens,
@@ -140,7 +142,7 @@ def evaluate(questions: list[dict], providers: list[str], repeats: int, raw_path
             if line.strip():
                 it = json.loads(line)
                 done[(it["provider"], it["repeat"], it["id"])] = it
-    db, price = ReadOnlyExecutor(), bedrock_price()
+    db, price, aliases = ReadOnlyExecutor(), bedrock_price(), catalog_aliases()
     gold_cache: dict[str, dict] = {}
     total = len(questions) * repeats * len(providers)
     raw_path.parent.mkdir(parents=True, exist_ok=True)
@@ -157,7 +159,7 @@ def evaluate(questions: list[dict], providers: list[str], repeats: int, raw_path
                     t0 = time.perf_counter()
                     try:
                         r = agent.ask(q["question"])
-                        item = score_item(q, r, gold_cache.get(q["id"]), price, provider, rep)
+                        item = score_item(q, r, gold_cache.get(q["id"]), price, provider, rep, aliases)
                     except Exception as e:  # noqa: BLE001 — un fallo del harness no detiene la corrida
                         item = _crashed(q, provider, rep, e, time.perf_counter() - t0)
                     raw.write(json.dumps(item, ensure_ascii=False) + "\n")
