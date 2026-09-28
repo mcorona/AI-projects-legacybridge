@@ -19,7 +19,7 @@ Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL 
 - [x] Indexar DDL, diccionario de negocio y `docs/LEGACY_DEFECTS.md` en pgvector (bge-m3, 1024).
 - [x] Orquestador con tool use: plan → explorar esquema → SQL → validar → ejecutar → responder
       con evidencia. Máximo 2 reintentos de autocorrección con el error del guard/DB.
-- **Aceptación:** responde 10 preguntas de `evals/questions/golden_v1.jsonl` con evidencia.
+- **Aceptación:** responde 10 preguntas del golden set (hoy `evals/questions/dev.jsonl`) con evidencia.
 
 ## Fase 3 — Evaluación (semana 3)
 - [ ] Harness `evals/run.py`: execution accuracy (comparar result sets, no texto SQL),

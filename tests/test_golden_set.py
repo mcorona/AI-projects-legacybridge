@@ -3,20 +3,24 @@
 No evalúa al agente (eso es evals/run.py, Fase 3): garantiza que el golden set mismo es
 correcto y que cada ataque adversarial con `attack_sql` lo rechaza el guard con el motivo esperado.
 """
-import json
-from pathlib import Path
-
 import pytest
 
+from evals.dataset import LEVELS, load as load_questions
 from legacybridge.dictionary import load
 from legacybridge.guard.sql_guard import validate
 
-GOLDEN = Path(__file__).resolve().parents[1] / "evals" / "questions" / "golden_v1.jsonl"
-ITEMS = [json.loads(line) for line in GOLDEN.read_text(encoding="utf-8").splitlines() if line.strip()]
-PREFIX = {"easy": "e", "medium": "m", "defect": "d", "adversarial": "a"}
+ITEMS = load_questions("all")
+PREFIX = dict(zip(LEVELS, "emda"))
+DEFECT_ITEMS = [q for q in ITEMS if q["level"] == "defect"]
 ALLOWED = set(load().allowed_tables)
 ANSWERABLE = [q for q in ITEMS if q["level"] != "adversarial"]
 ATTACKS = [q for q in ITEMS if "attack_sql" in q]
+MAX_GOLD_ROWS = 50   # = agent.core.MAX_ROWS_TO_MODEL
+
+
+def test_splits_are_disjoint():
+    dev, test = ({q["id"] for q in ITEMS if q["split"] == s} for s in ("dev", "test"))
+    assert dev and test and not dev & test
 
 
 def test_ids_unique_and_consistent_with_level():
@@ -52,6 +56,15 @@ def test_adversarial_items_declare_expected_behavior():
 def test_gold_sql_passes_guard(q):
     r = validate(q["gold_sql"], ALLOWED)
     assert r.ok, f"{q['id']}: {r.reason}"
+    if "naive_sql" in q:
+        n = validate(q["naive_sql"], ALLOWED)
+        assert n.ok, f"{q['id']} naive: {n.reason}"
+
+
+def test_defect_items_declare_naive_sql():
+    for q in DEFECT_ITEMS:
+        assert q.get("naive_sql"), f"{q['id']}: falta naive_sql"
+        assert q["defects"], f"{q['id']}: sin defectos"
 
 
 @pytest.mark.parametrize("q", ATTACKS, ids=lambda q: q["id"])
@@ -66,8 +79,26 @@ def test_attack_sql_is_blocked_by_guard(q):
 def test_gold_sql_executes_against_seed(q):
     from legacybridge.mcp_servers.sql_readonly import ReadOnlyExecutor
 
-    out = ReadOnlyExecutor().run(q["gold_sql"])
+    out = ReadOnlyExecutor().run(q["gold_sql"], max_rows=MAX_GOLD_ROWS + 1)
     if out.get("stage") == "connection":
         pytest.skip("Postgres legacy no disponible (make db)")
     assert out["ok"], f"{q['id']}: {out}"
-    assert out["row_count"] >= 1, f"{q['id']}: sin filas con los datos semilla"
+    assert out["row_count"] >= 1, f"{q['id']}: sin filas con los datos generados"
+    # el agente solo ve MAX_ROWS_TO_MODEL filas: una referencia más grande no es comparable
+    assert out["row_count"] <= MAX_GOLD_ROWS, f"{q['id']}: {out['row_count']} filas (> {MAX_GOLD_ROWS})"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("q", [q for q in ANSWERABLE if "naive_sql" in q], ids=lambda q: q["id"])
+def test_naive_answer_differs_from_gold(q):
+    """La pregunta discrimina: ignorar el defecto produce un resultado distinto."""
+    from legacybridge.mcp_servers.sql_readonly import ReadOnlyExecutor
+    from scripts.agent_check import result_sets_match
+
+    db = ReadOnlyExecutor()
+    gold, naive = db.run(q["gold_sql"], max_rows=200), db.run(q["naive_sql"], max_rows=200)
+    if gold.get("stage") == "connection":
+        pytest.skip("Postgres legacy no disponible (make db)")
+    assert gold["ok"] and naive["ok"], (gold, naive)
+    assert not result_sets_match(gold["columns"], gold["rows"], naive["columns"], naive["rows"]), \
+        f"{q['id']}: la respuesta ingenua coincide con la de referencia"

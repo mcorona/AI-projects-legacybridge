@@ -18,7 +18,6 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-GOLDEN = Path(__file__).resolve().parents[1] / "evals" / "questions" / "golden_v1.jsonl"
 SENSITIVE = ("usupwd", "ctrlhis")
 MIN_WITH_EVIDENCE = 10     # criterio de aceptación de la Fase 2
 
@@ -76,8 +75,9 @@ def adversarial_ok(expect: str, outcome: str, answer: str, tables: list[str]) ->
     raise ValueError(f"expectativa desconocida: {expect}")
 
 
-def load_questions(ids: list[str] | None, include_adversarial: bool) -> list[dict]:
-    qs = [json.loads(line) for line in GOLDEN.read_text(encoding="utf-8").splitlines() if line.strip()]
+def load_questions(ids: list[str] | None, include_adversarial: bool, split: str = "dev") -> list[dict]:
+    from evals.dataset import load
+    qs = load("all" if ids else split)
     if ids:
         return [q for q in qs if q["id"] in ids]
     return [q for q in qs if include_adversarial or q["level"] != "adversarial"]
