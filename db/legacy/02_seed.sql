@@ -4,6 +4,24 @@ INSERT INTO cliemae VALUES
  ('C00002','Refacciones Norte','RNO880505CD2','NLE','N','19990120'),
  ('C00003','Distribuidora Centro','DCE010202EF3','CDMX',NULL,'20040815');
 
+-- Personas físicas (Fase 4): su RFC de 13 caracteres es dato personal y se enmascara en la salida (ADR-006)
+INSERT INTO cliemae VALUES
+ ('C09001','Juan Pérez López','PELJ800101AB1','JAL','S','20150111'),
+ ('C09002','María González Ruiz','GORM850315QK2','NLE','S','20150212'),
+ ('C09003','José Hernández Soto','HESJ790622LM3','CDMX','S','20150313'),
+ ('C09004','Ana Martínez Vega','MAVA900908TR4','QRO','S','20150414'),
+ ('C09005','Luis Ramírez Cruz','RACL821130HN5','GTO','S','20150515'),
+ ('C09006','Laura Torres Díaz','TODL870412PX6','PUE','S','20150616'),
+ ('C09007','Carlos Flores Mora','FOMC760227BZ7','MEX','S','20150717'),
+ ('C09008','Sofía Castillo Rojas','CARS920719KD8','SLP','S','20150818'),
+ ('C09009','Miguel Ortiz Luna','OILM880504WE9','AGS','S','20150919'),
+ ('C09010','Elena Reyes Campos','RECE830816JA1','COA','S','20151020'),
+ ('C09011','Jorge Morales Silva','MOSJ781109GU2','JAL','S','20151121'),
+ ('C09012','Patricia Jiménez Nava','JINP910223FC3','NLE','S','20151222'),
+ ('C09013','Ricardo Vargas Peña','VAPR840601ST4','CDMX','S','20150123'),
+ ('C09014','Diana Guerrero Ibarra','GUID950318MV5','QRO','S','20150224'),
+ ('C09015','Fernando Aguilar Ríos','AURF770925YP6','GTO','S','20150325');
+
 INSERT INTO artmae VALUES
  ('TOR-001','Tornillo hexagonal 1/2','FE',0.8500,'PZA',1,'N'),
  ('TOR-001C','Tornillo hexagonal 1/2 caja','FE',75.0000,'CJA',100,'N'),

@@ -7,7 +7,7 @@ import pytest
 from scripts.gen_data import ANCHOR_DATE, INJECTIONS, defect_profile, generate
 
 DS = generate()
-ANCHOR_CLIENTS = {"C00001", "C00002", "C00003"}
+ANCHOR_CLIENTS = {"C00001", "C00002", "C00003"} | {f"C09{i:03d}" for i in range(1, 16)}
 ANCHOR_ARTICLES = {"TOR-001", "TOR-001C", "LAM-010", "SOL-500"}
 ANCHOR_ORDERS = {501, 1001, 1002, 1003}
 
@@ -84,10 +84,10 @@ def test_database_holds_anchor_plus_generated_rows():
         count = lambda t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]  # noqa: E731
         if count("pedenc") < 100:
             pytest.skip("BD con datos mínimos: correr `make seed`")
-        assert count("cliemae") == len(DS.cliemae) + 3
+        assert count("cliemae") == len(DS.cliemae) + 3 + 15      # ancla: 3 empresas + 15 personas físicas
         assert count("pedenc") == len(DS.pedenc) + 4
         assert count("peddet") == len(DS.peddet) + 4
         anchors = conn.execute("SELECT COUNT(*) FROM cliemae WHERE clicve = ANY(%s)",
                                (sorted(ANCHOR_CLIENTS),)).fetchone()[0]
-        assert anchors == 3
+        assert anchors == len(ANCHOR_CLIENTS)
         assert count("usupwd") == 1
