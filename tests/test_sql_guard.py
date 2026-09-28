@@ -58,6 +58,8 @@ def test_allows_valid_selects(sql):
     ("SELECT * FROM otro.cliemae", "schema_not_allowed"),
     ("SELECT * FROM legacy.public.cliemae", "schema_not_allowed"),
     ("SELECT * FROM pg_toast.x", "catalog_access"),
+    # el índice RAG lo lee solo código fijo; el SQL del LLM no puede tocarlo
+    ("SELECT content FROM rag.chunks", "schema_not_allowed"),
     ("SELECT * FROM pg_user", "catalog_access"),
     # SQL dentro de strings: se saltaría el AST
     ("SELECT query_to_xml('select * from usupwd', true, true, '')", "forbidden_function"),

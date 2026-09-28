@@ -1,4 +1,4 @@
-.PHONY: setup db test test-unit mcp-dev mcp-check smoke eval
+.PHONY: setup db db-migrate test test-unit mcp-dev mcp-check smoke eval
 
 setup:
 	python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -6,6 +6,13 @@ setup:
 
 db:
 	docker compose up -d --wait
+
+# Aplica migraciones idempotentes (03_* en adelante) a un volumen ya inicializado.
+# docker-entrypoint-initdb.d solo corre en un volumen NUEVO.
+db-migrate: db
+	@for f in db/legacy/0[3-9]_*.sql; do echo "== $$f"; \
+	  docker exec -i legacybridge-db psql -q -U postgres -d legacy -v ON_ERROR_STOP=1 < $$f || exit 1; \
+	done
 
 test:
 	. .venv/bin/activate && python -m pytest -q
