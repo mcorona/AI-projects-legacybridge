@@ -110,6 +110,7 @@ class AgentResult:
     latency_s: float = 0.0
     providers: dict[str, int] = field(default_factory=dict)
     llm_trace: list[dict] = field(default_factory=list)   # una entrada por llamada al LLM (telemetría)
+    escalations: list[dict] = field(default_factory=list)  # cascada por respuesta (ADR-007)
     guardrail_s: float = 0.0
     guardrail_findings: list[str] = field(default_factory=list)
     pending: ProposalPreview | None = None     # propuesta de cambio esperando confirmación humana

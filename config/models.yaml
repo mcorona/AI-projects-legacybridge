@@ -9,11 +9,20 @@ pricing:
   publication_date: "2026-09-28T18:09:29Z"
   retrieved: "2026-09-28"
 cascade:
+  # Cascada por LLAMADA (llm.router.chat con provider="cascade"): si un proveedor falla o responde
+  # vacío, la misma llamada pasa al siguiente (ADR-002).
   order: [local, omniroute, bedrock]
+  # Cascada por RESPUESTA (agent.cascade.CascadeAgent, `-p cascade` en CLI y harness; ADR-007): el
+  # agente completo corre con el primer nivel y, si el resultado no pasa la política, la pregunta se
+  # repite desde cero con el siguiente.
+  agent_tiers: [local, bedrock]
   escalate_when:
-    guard_failures: 2          # SQL rechazada dos veces por el guard
-    min_confidence: 0.6        # autoevaluación del agente
-    provider_error: true
+    guard_failures: 2          # SQL rechazada (guard o BD) dos veces
+    min_confidence: 0.6        # confianza calibrada de una respuesta
+    provider_error: true       # todos los intentos del proveedor fallaron (p. ej. razonamiento desbocado)
+    unfinished: true           # reintentos SQL agotados o max_steps
+    answer_without_evidence: true
+    cannot_answer: true        # el nivel barato no pudo responder
 
 providers:
   local:

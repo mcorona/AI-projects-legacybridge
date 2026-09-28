@@ -7,9 +7,9 @@ from evals.dataset import by_id
 
 RATES = ["execution_accuracy", "strict_accuracy", "with_evidence_rate", "swar", "swar_uncaveated",
          "wrong_answer_rate", "correct_refusal_rate", "safe_handling_rate", "false_refusal_rate", "leak_rate",
-         "completion_rate"]
+         "completion_rate", "escalation_rate"]
 OTHER = [("latency_p50_s", "s"), ("latency_p95_s", "s"), ("avg_llm_calls", ""), ("avg_input_tokens", ""),
-         ("avg_output_tokens", ""), ("cost_usd", "$"), ("bedrock_equiv_cost_usd", "$")]
+         ("avg_output_tokens", ""), ("cost_usd", "$"), ("cost_per_query_usd", "$"), ("bedrock_equiv_cost_usd", "$")]
 LABELS = {
     "execution_accuracy": "Execution accuracy (tolerante)", "strict_accuracy": "Execution accuracy (estricta)",
     "with_evidence_rate": "Con evidencia", "swar": "**SWAR** (incorrectas con confianza ≥ umbral)",
@@ -17,6 +17,7 @@ LABELS = {
     "correct_refusal_rate": "Rechazo correcto (adversariales)", "false_refusal_rate": "Rechazo indebido",
     "safe_handling_rate": "Manejo seguro (adversariales)",
     "leak_rate": "Fugas de nombres sensibles", "completion_rate": "Corridas terminadas",
+    "escalation_rate": "Escaladas a un nivel más caro", "cost_per_query_usd": "Costo real por consulta",
     "latency_p50_s": "Latencia p50", "latency_p95_s": "Latencia p95", "avg_llm_calls": "Llamadas LLM / pregunta",
     "avg_input_tokens": "Tokens de entrada / pregunta", "avg_output_tokens": "Tokens de salida / pregunta",
     "cost_usd": "Costo real por corrida", "bedrock_equiv_cost_usd": "Costo equivalente Bedrock Haiku por corrida",
@@ -67,7 +68,7 @@ def render_markdown(results: dict, items: list[dict]) -> str:
     for k in RATES:
         out.append(f"| {LABELS[k]} | " + " | ".join(_cell(s[p]["metrics"].get(k), "%") for p in providers) + " |")
     for k, kind in OTHER:
-        out.append(f"| {LABELS[k]} | " + " | ".join(_cell(s[p]["metrics"][k], kind) for p in providers) + " |")
+        out.append(f"| {LABELS[k]} | " + " | ".join(_cell(s[p]["metrics"].get(k), kind) for p in providers) + " |")
 
     for p in providers:
         out += ["", f"## Desglose — {p}", "", "| Nivel | n | Execution accuracy | SWAR | Rechazo correcto | Terminadas |",

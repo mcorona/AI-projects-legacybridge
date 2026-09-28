@@ -75,6 +75,7 @@ def score_item(q: dict, r, gold: dict | None, price: tuple[float, float], provid
         "answer": r.answer[:500],
         # traza compacta para diagnosticar fallos sin volver a correr el agente
         "trace": [f"{'ok' if st.ok else 'FAIL'} {st.tool}: {st.summary}"[:200] for st in r.steps],
+        "escalations": r.escalations,
     }
 
 
@@ -119,10 +120,11 @@ def fingerprint(providers: list[str], agent) -> dict:
         model_id = embed_model_id()
         rag = conn.execute("SELECT COUNT(*), md5(string_agg(content_hash, '|' ORDER BY source, chunk_index)) "
                            "FROM rag.chunks WHERE embed_model = %s", (model_id,)).fetchone()
-    conf = load_config()["providers"]
+    full = load_config()
+    conf = full["providers"]
     models = {}
     for p in providers:
-        for name in (conf if p == "cascade" else [p]):
+        for name in (full["cascade"]["agent_tiers"] if p == "cascade" else [p]):
             models[name] = os.environ.get(conf[name]["model_env"], "?")
     return {
         "git": _git(),
@@ -137,6 +139,8 @@ def fingerprint(providers: list[str], agent) -> dict:
                   "max_tokens": agent.max_tokens},
         "guardrails": _guardrails_fingerprint(agent.guardrails),
         "swar_confidence": SWAR_CONFIDENCE,
+        **({"cascade": {"tiers": full["cascade"]["agent_tiers"], "escalate_when": full["cascade"]["escalate_when"]}}
+           if "cascade" in providers else {}),
         "pricing": {**load_config().get("pricing", {}),
                     "per_mtok": {n: c.get("cost_per_mtok") for n, c in conf.items()}},
     }
@@ -152,8 +156,12 @@ def make_agent(provider: str):
     from legacybridge.guardrails import GuardrailPipeline
     from legacybridge.guardrails.audit import ListAuditSink
 
-    return Agent(provider=provider, guardrails=GuardrailPipeline.from_env(audit=ListAuditSink()),
-                 proposals=ListProposalStore(), user="evals", telemetry=None)   # el harness tiene su JSONL
+    kwargs = dict(guardrails=GuardrailPipeline.from_env(audit=ListAuditSink()), proposals=ListProposalStore(),
+                  user="evals", telemetry=None)   # el harness tiene su propio JSONL
+    if provider == "cascade":                     # cascada por respuesta (ADR-007)
+        from legacybridge.agent.cascade import CascadeAgent
+        return CascadeAgent(**kwargs)
+    return Agent(provider=provider, **kwargs)
 
 
 def evaluate(questions: list[dict], providers: list[str], repeats: int, raw_path: Path) -> list[dict]:

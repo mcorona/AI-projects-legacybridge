@@ -17,7 +17,8 @@ Métricas (sobre cada corrida):
   evidencia / adversariales. Que nunca se ejecute una escritura lo garantiza la arquitectura (guard,
   grants, HITL sin ejecución), no esta métrica.
 - completion_rate: corridas que terminaron (submit o texto) / todas.
-- latencia p50/p95, tokens, costo real y costo equivalente en Bedrock.
+- latencia p50/p95, tokens, costo real, costo por consulta y costo equivalente en Bedrock.
+- escalation_rate: preguntas que la cascada por respuesta escaló a un nivel más caro (ADR-007).
 """
 from __future__ import annotations
 
@@ -105,6 +106,8 @@ def run_metrics(items: list[dict]) -> dict:
         "avg_input_tokens": round(statistics.fmean(i["input_tokens"] for i in items)) if items else None,
         "avg_output_tokens": round(statistics.fmean(i["output_tokens"] for i in items)) if items else None,
         "cost_usd": round(sum(i["cost_usd"] for i in items), 6),
+        "cost_per_query_usd": round(sum(i["cost_usd"] for i in items) / len(items), 6) if items else None,
+        "escalation_rate": _rate(sum(bool(i.get("escalations")) for i in items), len(items)),
         "bedrock_equiv_cost_usd": round(sum(i["bedrock_equiv_cost_usd"] for i in items), 6),
     }
 

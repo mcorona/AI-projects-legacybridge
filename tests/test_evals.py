@@ -278,3 +278,9 @@ def test_bedrock_price_has_source_and_matches_regional_haiku():
     assert conf["pricing"]["publication_date"] and "AmazonBedrockFoundationModels" in conf["pricing"]["source"]
     assert conf["providers"]["bedrock"]["cost_per_mtok"] == {"input": 1.10, "output": 5.50}
     assert run.bedrock_price() == (1.10, 5.50)
+
+
+
+def test_escalation_rate_and_cost_per_query():
+    m = run_metrics([item(escalations=[{"reason": "provider_error"}], cost_usd=0.02), item(cost_usd=0.0)])
+    assert m["escalation_rate"] == 0.5 and m["cost_per_query_usd"] == 0.01

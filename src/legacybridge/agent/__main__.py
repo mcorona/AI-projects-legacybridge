@@ -36,6 +36,8 @@ def render(r: AgentResult) -> str:
     out.append("\nTraza:")
     out += [f"  {'✓' if s.ok else '✗'} {s.tool:18} {s.summary}" for s in r.steps]
     providers = ", ".join(f"{p}×{n}" for p, n in r.providers.items())
+    for e in r.escalations:
+        out.append(f"  ↑ escalada {e['from']} → {e['to']}: {e['reason']}")
     out.append(f"\n{r.latency_s:.1f}s · {r.llm_calls} llamadas LLM ({providers}) · "
                f"tokens {r.input_tokens}/{r.output_tokens} · ${r.cost_usd:.6f}"
                + (f" · reintentos SQL {r.sql_failures}" if r.sql_failures else ""))
@@ -54,7 +56,11 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    agent = Agent(provider=args.provider, user=args.user)
+    if args.provider == "cascade":      # cascada por respuesta: local -> Bedrock (ADR-007)
+        from legacybridge.agent.cascade import CascadeAgent
+        agent = CascadeAgent(user=args.user)
+    else:
+        agent = Agent(provider=args.provider, user=args.user)
     r = agent.ask(" ".join(args.question))
     if r.stop_reason == "confirmation_required":
         p = r.pending
