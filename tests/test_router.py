@@ -116,3 +116,76 @@ def test_unknown_provider_is_config_error(fake):
     fake()
     with pytest.raises(KeyError):
         router.chat(MSG, provider="nope")
+
+
+# ---------------------------------------------------------------- tool calls
+
+CALL = router.ToolCall("c1", "find_columns", {"concept": "moneda"})
+
+
+def test_tool_calls_without_text_are_not_empty(fake):
+    """Qwen devuelve content '\\n\\n' junto con tool_calls: no es una respuesta vacía."""
+    fake(local=lambda cfg, m, s, **kw: ("qwen", "\n\n", 50, 20, "tool_calls", (CALL,)))
+    r = router.chat(MSG, provider="cascade", tools=[{"name": "find_columns"}])
+    assert r.provider == "local" and r.tool_calls == (CALL,) and r.text == ""
+
+
+def test_tools_are_forwarded_to_backend(fake):
+    seen = {}
+
+    def local(cfg, messages, system, tools=None, **kw):
+        seen.update(tools=tools, max_tokens=kw.get("max_tokens"))
+        return "qwen", "ok", 1, 1, "stop"
+    fake(local=local)
+    router.chat(MSG, provider="local", tools=[{"name": "t"}], max_tokens=99)
+    assert seen == {"tools": [{"name": "t"}], "max_tokens": 99}
+
+
+# ---------------------------------------------------------------- embeddings
+
+EMB_CONF = {**CONF, "embeddings": {"default": "local", "providers": {
+    "local": {"kind": "fake_embed", "model_env": "X", "dims": 3, "cost_per_mtok": {"input": 0.0}},
+    "paid": {"kind": "fake_embed", "model_env": "X", "dims": 3, "cost_per_mtok": {"input": 2.0}},
+}}}
+
+
+@pytest.fixture
+def fake_embed(monkeypatch):
+    monkeypatch.setattr(router, "load_config", lambda: EMB_CONF)
+    monkeypatch.delenv("EMBED_PROVIDER", raising=False)
+    impl = {}
+    monkeypatch.setattr(router, "_EMBED_BACKENDS", {"fake_embed": lambda cfg, texts: impl["fn"](texts)})
+
+    def configure(fn):
+        impl["fn"] = fn
+    return configure
+
+
+def test_embed_returns_vectors_and_model_id(fake_embed):
+    fake_embed(lambda texts: ("bge-m3", [[0.1, 0.2, 0.3] for _ in texts], 7))
+    r = router.embed(["a", "b"])
+    assert len(r.vectors) == 2 and r.model_id == "local:bge-m3" and r.input_tokens == 7
+
+
+def test_embed_provider_from_env_and_cost(fake_embed, monkeypatch):
+    monkeypatch.setenv("EMBED_PROVIDER", "paid")
+    fake_embed(lambda texts: ("titan", [[0.0] * 3], 500_000))
+    r = router.embed(["a"])
+    assert r.provider == "paid" and r.cost_usd == pytest.approx(1.0)
+
+
+def test_embed_rejects_wrong_dimension(fake_embed):
+    fake_embed(lambda texts: ("m", [[0.1, 0.2]], 1))
+    with pytest.raises(RuntimeError, match="dimensión 2 != 3"):
+        router.embed(["a"])
+
+
+def test_embed_rejects_count_mismatch(fake_embed):
+    fake_embed(lambda texts: ("m", [[0.1, 0.2, 0.3]], 1))
+    with pytest.raises(RuntimeError, match="1 vectores para 2 textos"):
+        router.embed(["a", "b"])
+
+
+def test_embed_empty_input_does_not_call_backend(fake_embed):
+    fake_embed(lambda texts: pytest.fail("no debe llamarse"))
+    assert router.embed([]).vectors == []

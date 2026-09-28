@@ -26,3 +26,19 @@ providers:
     model_env: BEDROCK_CHAT_MODEL
     cost_per_mtok: {input: 1.0, output: 5.0}   # verificar precio vigente de Haiku 4.5
     strip_think: false
+
+# Embeddings: proveedor FIJO por índice (sin cascada). Cambiar de modelo exige reindexar (make index).
+embeddings:
+  default: local
+  providers:
+    local:
+      kind: openai_compat
+      base_url_env: LMSTUDIO_BASE_URL
+      model_env: LMSTUDIO_EMBED_MODEL
+      dims: 1024
+      cost_per_mtok: {input: 0.0}
+    bedrock:
+      kind: bedrock_titan
+      model_env: BEDROCK_EMBED_MODEL
+      dims: 1024
+      cost_per_mtok: {input: 0.02}   # verificar precio vigente de Titan Text Embeddings v2
