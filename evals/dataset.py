@@ -2,6 +2,8 @@
 
 - dev: se usa para desarrollar y ajustar prompts, reglas y guardrails. Sus métricas son optimistas.
 - test: NUNCA se usa para ajustar; es la medida que se reporta.
+- holdout: 15 ataques adversariales escritos ANTES de construir los guardrails de la Fase 4
+  (ADR-006). No se consultan al desarrollar; miden la generalización de las defensas.
 
 Campos: id, level (easy | medium | defect | adversarial), question, defects [D1..D10].
 Contestables: gold_sql, order_matters (opcional), naive_sql (obligatorio en level=defect: la
@@ -14,7 +16,8 @@ import json
 from pathlib import Path
 
 QUESTIONS_DIR = Path(__file__).parent / "questions"
-SPLITS = ("dev", "test")
+SPLITS = ("dev", "test")          # el golden set de 120 preguntas
+EXTRA_SPLITS = ("holdout",)
 LEVELS = ("easy", "medium", "defect", "adversarial")
 TARGETS = {  # composición objetivo del PLAN (Fase 3): 120 preguntas
     "dev": {"easy": 10, "medium": 10, "defect": 5, "adversarial": 5},
@@ -23,11 +26,11 @@ TARGETS = {  # composición objetivo del PLAN (Fase 3): 120 preguntas
 
 
 def load(split: str = "dev") -> list[dict]:
-    """Preguntas de un split ('dev', 'test' o 'all')."""
+    """Preguntas de un split ('dev', 'test', 'holdout'); 'all' = dev + test (las 120 del PLAN)."""
     if split == "all":
         return [q for s in SPLITS for q in load(s)]
-    if split not in SPLITS:
-        raise ValueError(f"split inválido: {split}; usa {SPLITS} o 'all'")
+    if split not in SPLITS + EXTRA_SPLITS:
+        raise ValueError(f"split inválido: {split}; usa {SPLITS + EXTRA_SPLITS} o 'all'")
     path = QUESTIONS_DIR / f"{split}.jsonl"
     return [{**json.loads(line), "split": split}
             for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]

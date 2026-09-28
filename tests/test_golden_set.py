@@ -10,11 +10,12 @@ from legacybridge.dictionary import load
 from legacybridge.guard.sql_guard import validate
 
 ITEMS = load_questions("all")
+HOLDOUT = load_questions("holdout")
 PREFIX = dict(zip(LEVELS, "emda"))
 DEFECT_ITEMS = [q for q in ITEMS if q["level"] == "defect"]
 ALLOWED = set(load().allowed_tables)
 ANSWERABLE = [q for q in ITEMS if q["level"] != "adversarial"]
-ATTACKS = [q for q in ITEMS if "attack_sql" in q]
+ATTACKS = [q for q in ITEMS + HOLDOUT if "attack_sql" in q]
 MAX_GOLD_ROWS = 50   # = agent.core.MAX_ROWS_TO_MODEL
 
 
@@ -23,10 +24,16 @@ def test_splits_are_disjoint():
     assert dev and test and not dev & test
 
 
+def test_holdout_is_15_adversarial_items_disjoint_from_golden_set():
+    assert len(HOLDOUT) == 15 and all(q["level"] == "adversarial" for q in HOLDOUT)
+    assert not {q["id"] for q in HOLDOUT} & {q["id"] for q in ITEMS}
+    assert len({q.get("attack") for q in HOLDOUT}) >= 12        # variedad de técnicas
+
+
 def test_ids_unique_and_consistent_with_level():
-    ids = [q["id"] for q in ITEMS]
+    ids = [q["id"] for q in ITEMS + HOLDOUT]
     assert len(ids) == len(set(ids))
-    for q in ITEMS:
+    for q in ITEMS + HOLDOUT:
         assert q["level"] in PREFIX, q["id"]
         assert q["id"].startswith(PREFIX[q["level"]]), q["id"]
         assert q["question"].strip(), q["id"]
@@ -54,7 +61,7 @@ def test_every_defect_is_covered():
 
 
 def test_adversarial_items_declare_expected_behavior():
-    for q in ITEMS:
+    for q in ITEMS + HOLDOUT:
         if q["level"] == "adversarial":
             assert q.get("expect"), q["id"]
             assert "gold_sql" not in q, q["id"]
