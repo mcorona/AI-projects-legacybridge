@@ -80,3 +80,42 @@ def sync_index(chunks: list[Chunk], embed_fn: EmbedFn, model_id: str, dsn: str |
                   json.dumps(c.metadata, ensure_ascii=False), to_vector_literal(v))
                  for c, v in zip(todo, vectors, strict=True)])
     return report
+
+
+# ---------------------------------------------------------------- lectura
+
+MAX_K = 10
+KINDS = ("ddl", "table", "rule", "catalog", "defect", "doc")
+# Consulta FIJA: el LLM solo aporta el texto a embeber, nunca SQL.
+SEARCH_SQL = """
+SELECT source, kind, ref, content, 1 - (embedding <=> %(q)s::vector) AS score
+FROM rag.chunks
+WHERE embed_model = %(model)s AND (%(kinds)s::text[] IS NULL OR kind = ANY(%(kinds)s::text[]))
+ORDER BY embedding <=> %(q)s::vector
+LIMIT %(k)s"""
+
+
+def search(query: str, k: int = 5, kinds: list[str] | None = None, dsn: str | None = None,
+           embed_fn: Callable[[str], tuple[str, list[float]]] | None = None) -> list[dict]:
+    """Fragmentos más similares a `query` en el espacio del modelo de embeddings activo."""
+    import psycopg
+
+    if embed_fn is None:
+        from legacybridge.llm.router import embed
+
+        def embed_fn(text: str) -> tuple[str, list[float]]:
+            r = embed([text])
+            return r.model_id, r.vectors[0]
+    k = max(1, min(int(k), MAX_K))
+    if kinds:
+        unknown = set(kinds) - set(KINDS)
+        if unknown:
+            raise ValueError(f"tipos desconocidos: {sorted(unknown)}; válidos: {list(KINDS)}")
+    model_id, vec = embed_fn(query)
+    with psycopg.connect(dsn or os.environ.get("LB_DSN", DEFAULT_READ_DSN), connect_timeout=3) as conn:
+        conn.read_only = True
+        conn.execute("SELECT set_config('statement_timeout', '5000', true)")
+        rows = conn.execute(SEARCH_SQL, {"q": to_vector_literal(vec), "model": model_id,
+                                         "kinds": list(kinds) if kinds else None, "k": k}).fetchall()
+    return [{"source": s, "kind": kd, "ref": ref, "score": round(float(sc), 4), "content": c}
+            for s, kd, ref, c, sc in rows]

@@ -34,13 +34,16 @@ def _assert_read_only(tools: dict):
 
 def test_schema_server_exposes_read_only_tools():
     tools = _tools(schema_explorer.build_server())
-    assert set(tools) == {"list_tables", "describe_table", "find_columns", "get_business_rule"}
+    assert set(tools) == {"list_tables", "describe_table", "find_columns", "get_business_rule",
+                          "search_knowledge"}
     _assert_read_only(tools)
     assert tools["describe_table"].input_schema["required"] == ["table"]
     fc = tools["find_columns"].input_schema
     assert fc["required"] == ["concept"] and fc["properties"]["limit"]["default"] == 8
     assert fc["properties"]["limit"]["maximum"] == 25
     assert fc["properties"]["concept"]["description"]
+    sk = tools["search_knowledge"].input_schema
+    assert sk["required"] == ["query"] and sk["properties"]["k"]["maximum"] == 10
 
 
 def test_schema_server_tools_delegate_to_explorer():
@@ -49,6 +52,12 @@ def test_schema_server_tools_delegate_to_explorer():
     assert [(m["table"], m["column"]) for m in out["matches"]] == [("pedenc", "pedmon")]
     assert _call(server, "get_business_rule", {"term": "pedido válido"})["matched"] is True
     assert _call(server, "describe_table", {"table": "usupwd"})["error"] == "table_not_allowed"
+
+
+def test_search_knowledge_rejects_unknown_kind_at_schema_level():
+    server = schema_explorer.build_server(schema_explorer.SchemaExplorer(search_fn=lambda *a: []))
+    res = _run(server, lambda c: c.call_tool("search_knowledge", {"query": "x", "kinds": ["usupwd"]}))
+    assert res.is_error
 
 
 def test_sql_server_exposes_only_run_query():

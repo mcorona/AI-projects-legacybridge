@@ -10,7 +10,8 @@ from mcp import Client, StdioServerParameters
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = json.loads((ROOT / ".mcp.json").read_text())["mcpServers"]
 EXPECTED_TOOLS = {
-    "legacybridge-schema": {"list_tables", "describe_table", "find_columns", "get_business_rule"},
+    "legacybridge-schema": {"list_tables", "describe_table", "find_columns", "get_business_rule",
+                            "search_knowledge"},
     "legacybridge-sql": {"run_query"},
 }
 PROBE = {

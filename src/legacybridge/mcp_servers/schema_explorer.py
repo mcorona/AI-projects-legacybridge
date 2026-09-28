@@ -1,8 +1,8 @@
 """MCP server: exploración del esquema legacy y reglas de negocio (solo metadatos).
 
-Tools: list_tables, describe_table, find_columns, get_business_rule.
-Nunca ejecuta SQL generada por el LLM: solo una consulta fija a information_schema con el
-rol `lb_ro`, que únicamente ve las tablas de la allowlist.
+Tools: list_tables, describe_table, find_columns, get_business_rule, search_knowledge.
+Nunca ejecuta SQL generada por el LLM: solo consultas fijas (information_schema y el índice
+RAG `rag.chunks`) con el rol `lb_ro`, que únicamente ve las tablas de la allowlist.
 
 Arranque por stdio: `python -m legacybridge.mcp_servers.schema_explorer`.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
@@ -23,7 +23,9 @@ INSTRUCTIONS = (
     "Metadatos del ERP legacy (nombres crípticos, sin llaves foráneas, fechas como texto, "
     "estatus mágicos). Flujo sugerido: list_tables para orientarte, find_columns para "
     "traducir un concepto de negocio a columnas, describe_table antes de escribir SQL y "
-    "get_business_rule para convenciones (cliente activo, pedido válido, moneda, fechas)."
+    "get_business_rule para convenciones (cliente activo, pedido válido, moneda, fechas). "
+    "search_knowledge busca por significado en DDL, fichas de tablas, reglas, catálogos y "
+    "defectos conocidos cuando no sabes qué término usar."
 )
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False,
                             idempotent_hint=True, open_world_hint=False)
@@ -35,6 +37,12 @@ _COLUMNS_SQL = (
 )
 
 DbColumns = Callable[[str], list[dict]]
+SearchFn = Callable[..., list[dict]]
+
+
+def _default_search(query: str, k: int, kinds: list[str] | None) -> list[dict]:
+    from legacybridge.rag.store import search
+    return search(query, k=k, kinds=kinds)
 
 
 def fetch_db_columns(table: str) -> list[dict]:
@@ -75,9 +83,11 @@ class SchemaExplorer:
     """Lógica de las tools, independiente del transporte MCP (probada sin BD)."""
 
     def __init__(self, dictionary: BusinessDictionary | None = None,
-                 db_columns: DbColumns | None = fetch_db_columns):
+                 db_columns: DbColumns | None = fetch_db_columns,
+                 search_fn: SearchFn | None = _default_search):
         self.d = dictionary or load_dictionary()
         self.db_columns = db_columns
+        self.search_fn = search_fn
 
     # ------------------------------------------------------------------ list_tables
     def list_tables(self) -> dict:
@@ -176,6 +186,20 @@ class SchemaExplorer:
                 "hint": "Sin coincidencias; consulta una de las reglas o catálogos disponibles."}
 
 
+    # ------------------------------------------------------------------ search_knowledge
+    def search_knowledge(self, query: str, k: int = 5, kinds: list[str] | None = None) -> dict:
+        if self.search_fn is None:
+            return {"query": query, "error": "search_unavailable", "results": []}
+        try:
+            hits = self.search_fn(query, k, kinds)
+        except ValueError as e:          # argumentos inválidos (p. ej. kinds desconocido)
+            return {"query": query, "error": "invalid_arguments", "message": str(e), "results": []}
+        except Exception as e:  # noqa: BLE001 — BD o servidor de embeddings caído
+            return {"query": query, "error": "search_unavailable",
+                    "message": f"{type(e).__name__}: {e}".splitlines()[0][:200], "results": []}
+        return {"query": query, "results": hits}
+
+
 def build_server(explorer: SchemaExplorer | None = None) -> MCPServer:
     ex = explorer or SchemaExplorer()
     server = MCPServer(name="legacybridge-schema", instructions=INSTRUCTIONS)
@@ -209,6 +233,17 @@ def build_server(explorer: SchemaExplorer | None = None) -> MCPServer:
         """Reglas y catálogos del negocio que aplican a un término. Si no hay coincidencias,
         devuelve matched=false y la lista de reglas disponibles."""
         return ex.get_business_rule(term)
+
+    @server.tool(annotations=READ_ONLY)
+    def search_knowledge(
+        query: Annotated[str, Field(description="Qué buscar, en lenguaje natural")],
+        k: Annotated[int, Field(ge=1, le=10, description="Número de fragmentos")] = 5,
+        kinds: Annotated[list[Literal["ddl", "table", "rule", "catalog", "defect", "doc"]] | None,
+                         Field(description="Filtrar por tipo de fragmento (opcional)")] = None,
+    ) -> dict:
+        """Búsqueda semántica en el conocimiento del esquema (DDL, fichas de tablas, reglas,
+        catálogos y defectos D1-D10). Devuelve fragmentos con fuente y similitud."""
+        return ex.search_knowledge(query, k, kinds)
 
     return server
 

@@ -134,3 +134,23 @@ def test_lb_ro_cannot_see_sensitive_columns():
     except Exception:  # noqa: BLE001
         pytest.skip("Postgres legacy no disponible (make db)")
     assert cols == []
+
+
+def test_search_knowledge_delegates():
+    seen = {}
+
+    def fake(query, k, kinds):
+        seen.update(query=query, k=k, kinds=kinds)
+        return [{"source": "rule:fecha", "score": 0.5}]
+    out = SchemaExplorer(search_fn=fake).search_knowledge("fechas", 3, ["rule"])
+    assert out == {"query": "fechas", "results": [{"source": "rule:fecha", "score": 0.5}]}
+    assert seen == {"query": "fechas", "k": 3, "kinds": ["rule"]}
+
+
+@pytest.mark.parametrize("exc,error", [(ValueError("tipos desconocidos"), "invalid_arguments"),
+                                       (ConnectionError("LM Studio apagado"), "search_unavailable")])
+def test_search_knowledge_errors_are_structured(exc, error):
+    def boom(*_):
+        raise exc
+    out = SchemaExplorer(search_fn=boom).search_knowledge("x")
+    assert out["error"] == error and out["results"] == [] and out["message"]
