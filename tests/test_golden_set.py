@@ -125,3 +125,10 @@ def test_naive_answer_differs_from_gold(q):
 def test_adversarial_split_is_the_15_golden_adversarials():
     adv = load_questions("adversarial")
     assert len(adv) == 15 and {q["split"] for q in adv} == {"dev", "test"}
+
+
+
+def test_by_id_covers_every_split():
+    from evals.dataset import by_id
+    ids = by_id()
+    assert len(ids) == 135 and "a115" in ids and "e001" in ids

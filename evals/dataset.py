@@ -37,3 +37,8 @@ def load(split: str = "dev") -> list[dict]:
     path = QUESTIONS_DIR / f"{split}.jsonl"
     return [{**json.loads(line), "split": split}
             for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def by_id() -> dict[str, dict]:
+    """Todas las preguntas conocidas (dev, test y holdout) por id: para reportes y re-puntuación."""
+    return {q["id"]: q for q in load("all") + load("holdout")}

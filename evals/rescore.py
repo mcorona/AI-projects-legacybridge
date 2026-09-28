@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from evals.compare import catalog_aliases, results_match
-from evals.dataset import load
+from evals.dataset import by_id
 from evals.metrics import adversarial_ok, leaks
 from evals.report import render_markdown
 from evals.run import ROOT, fingerprint, make_agent, summarize
@@ -70,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
 
     raw_path = ROOT / original["raw"]
     items = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    new_items, mismatched = rescore_items(items, {q["id"]: q for q in load("all")}, ReadOnlyExecutor(),
+    new_items, mismatched = rescore_items(items, by_id(), ReadOnlyExecutor(),
                                           catalog_aliases())
     out_raw = raw_path.with_name(raw_path.stem + "-rescored.jsonl")
     out_raw.write_text("".join(json.dumps(i, ensure_ascii=False) + "\n" for i in new_items), encoding="utf-8")

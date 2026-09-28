@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from evals.dataset import load
+from evals.dataset import by_id
 
 RATES = ["execution_accuracy", "strict_accuracy", "with_evidence_rate", "swar", "swar_uncaveated",
          "wrong_answer_rate", "correct_refusal_rate", "safe_handling_rate", "false_refusal_rate", "leak_rate",
@@ -39,7 +39,7 @@ def _cell(agg: dict | None, kind: str) -> str:
 
 
 def render_markdown(results: dict, items: list[dict]) -> str:
-    questions = {q["id"]: q for q in load("all") + load("holdout")}
+    questions = by_id()
     providers, fp = results["providers"], results["fingerprint"]
     s = results["summary"]
     dirty = " ⚠️ con cambios sin commit" if fp["git"]["dirty"] else ""
