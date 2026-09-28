@@ -74,7 +74,9 @@ def build_toolbox(explorer: SchemaExplorer | None = None,
         "search_knowledge": lambda a: ex.search_knowledge(a["query"], int(a.get("k", 5)), a.get("kinds")),
         "run_query": lambda a: sql.run(a["sql"], int(a.get("max_rows", 100))),
     }
-    specs = mcp_tool_specs(build_schema_server(ex), build_sql_server(sql)) + [SUBMIT_ANSWER]
+    # WARNING: MCPServer configura el logger raíz; dentro del agente no queremos ruido INFO
+    specs = mcp_tool_specs(build_schema_server(ex, log_level="WARNING"),
+                           build_sql_server(sql, log_level="WARNING")) + [SUBMIT_ANSWER]
     missing = {s["name"] for s in specs} - set(handlers) - {"submit_answer"}
     if missing:   # un tool nuevo en un MCP server sin handler en el agente
         raise RuntimeError(f"tools sin handler en el agente: {sorted(missing)}")

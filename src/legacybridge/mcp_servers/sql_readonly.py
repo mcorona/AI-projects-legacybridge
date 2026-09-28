@@ -132,9 +132,10 @@ def _error_type(e: Exception) -> str:
     return type(e).__name__
 
 
-def build_server(executor: ReadOnlyExecutor | None = None) -> MCPServer:
+def build_server(executor: ReadOnlyExecutor | None = None, log_level: str = "INFO") -> MCPServer:
     ex = executor or ReadOnlyExecutor()
-    server = MCPServer(name="legacybridge-sql", instructions=INSTRUCTIONS)
+    server = MCPServer(name="legacybridge-sql", instructions=INSTRUCTIONS,
+                       log_level=log_level)  # type: ignore[arg-type]
 
     @server.tool(annotations=READ_ONLY)
     def run_query(

@@ -200,9 +200,10 @@ class SchemaExplorer:
         return {"query": query, "results": hits}
 
 
-def build_server(explorer: SchemaExplorer | None = None) -> MCPServer:
+def build_server(explorer: SchemaExplorer | None = None, log_level: str = "INFO") -> MCPServer:
     ex = explorer or SchemaExplorer()
-    server = MCPServer(name="legacybridge-schema", instructions=INSTRUCTIONS)
+    server = MCPServer(name="legacybridge-schema", instructions=INSTRUCTIONS,
+                       log_level=log_level)  # type: ignore[arg-type]
 
     @server.tool(annotations=READ_ONLY)
     def list_tables() -> dict:
