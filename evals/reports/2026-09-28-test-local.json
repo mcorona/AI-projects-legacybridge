@@ -1,0 +1,376 @@
+{
+  "started_at": "2026-09-28T12:33:18+00:00",
+  "finished_at": "2026-09-28T18:49:20+00:00",
+  "split": "test",
+  "questions": 90,
+  "repeats": 3,
+  "providers": [
+    "local"
+  ],
+  "raw": "evals/results/raw/941f8479.jsonl",
+  "fingerprint": {
+    "git": {
+      "commit": "24093b4",
+      "dirty": false
+    },
+    "datasets": {
+      "dev": "bad1226225dcaf38",
+      "test": "039c8645c5bc0ea0"
+    },
+    "prompt": "a9fd8972afe84eb4",
+    "tools": "fc6005c413bee73c",
+    "dictionary": "395fb2503cf04439",
+    "data": {
+      "rows": {
+        "cliemae": 200,
+        "artmae": 304,
+        "almexi": 520,
+        "pedenc": 2004,
+        "peddet": 5825
+      },
+      "sha": "a191c504cffdcc2e"
+    },
+    "rag_index": {
+      "embed_model": "local:text-embedding-bge-m3",
+      "chunks": 34,
+      "sha": "1a58129c16e6e932"
+    },
+    "models": {
+      "local": "qwen/qwen3.6-35b-a3b"
+    },
+    "agent": {
+      "max_steps": 12,
+      "max_sql_retries": 2,
+      "max_tokens": 8192
+    },
+    "swar_confidence": 0.6
+  },
+  "summary": {
+    "local": {
+      "metrics": {
+        "n": {
+          "mean": 90.0,
+          "min": 90,
+          "max": 90,
+          "n": 3
+        },
+        "answerable": {
+          "mean": 80.0,
+          "min": 80,
+          "max": 80,
+          "n": 3
+        },
+        "adversarial": {
+          "mean": 10.0,
+          "min": 10,
+          "max": 10,
+          "n": 3
+        },
+        "execution_accuracy": {
+          "mean": 0.7417,
+          "min": 0.7125,
+          "max": 0.7625,
+          "n": 3
+        },
+        "strict_accuracy": {
+          "mean": 0.7042,
+          "min": 0.675,
+          "max": 0.725,
+          "n": 3
+        },
+        "with_evidence_rate": {
+          "mean": 0.85,
+          "min": 0.85,
+          "max": 0.85,
+          "n": 3
+        },
+        "swar": {
+          "mean": 0.0917,
+          "min": 0.0875,
+          "max": 0.1,
+          "n": 3
+        },
+        "swar_uncaveated": {
+          "mean": 0.0417,
+          "min": 0.0375,
+          "max": 0.05,
+          "n": 3
+        },
+        "wrong_answer_rate": {
+          "mean": 0.0917,
+          "min": 0.0875,
+          "max": 0.1,
+          "n": 3
+        },
+        "correct_refusal_rate": {
+          "mean": 0.7,
+          "min": 0.7,
+          "max": 0.7,
+          "n": 3
+        },
+        "false_refusal_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "leak_rate": {
+          "mean": 0.0111,
+          "min": 0.0111,
+          "max": 0.0111,
+          "n": 3
+        },
+        "completion_rate": {
+          "mean": 0.8407,
+          "min": 0.8222,
+          "max": 0.8556,
+          "n": 3
+        },
+        "latency_p50_s": {
+          "mean": 16.144,
+          "min": 15.541,
+          "max": 16.447,
+          "n": 3
+        },
+        "latency_p95_s": {
+          "mean": 91.4857,
+          "min": 84.534,
+          "max": 97.675,
+          "n": 3
+        },
+        "avg_llm_calls": {
+          "mean": 4.3333,
+          "min": 4.29,
+          "max": 4.38,
+          "n": 3
+        },
+        "avg_input_tokens": {
+          "mean": 14182.3333,
+          "min": 13943,
+          "max": 14531,
+          "n": 3
+        },
+        "avg_output_tokens": {
+          "mean": 1500.3333,
+          "min": 1366,
+          "max": 1671,
+          "n": 3
+        },
+        "cost_usd": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "bedrock_equiv_cost_usd": {
+          "mean": 1.9516,
+          "min": 1.881219,
+          "max": 2.059893,
+          "n": 3
+        }
+      },
+      "per_run": [
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.7125,
+          "strict_accuracy": 0.675,
+          "with_evidence_rate": 0.85,
+          "swar": 0.1,
+          "swar_uncaveated": 0.0375,
+          "wrong_answer_rate": 0.1,
+          "correct_refusal_rate": 0.7,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0111,
+          "completion_rate": 0.8222,
+          "latency_p50_s": 15.541,
+          "latency_p95_s": 84.534,
+          "avg_llm_calls": 4.29,
+          "avg_input_tokens": 13943,
+          "avg_output_tokens": 1464,
+          "cost_usd": 0.0,
+          "bedrock_equiv_cost_usd": 1.913814
+        },
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.75,
+          "strict_accuracy": 0.7125,
+          "with_evidence_rate": 0.85,
+          "swar": 0.0875,
+          "swar_uncaveated": 0.0375,
+          "wrong_answer_rate": 0.0875,
+          "correct_refusal_rate": 0.7,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0111,
+          "completion_rate": 0.8444,
+          "latency_p50_s": 16.447,
+          "latency_p95_s": 97.675,
+          "avg_llm_calls": 4.38,
+          "avg_input_tokens": 14531,
+          "avg_output_tokens": 1671,
+          "cost_usd": 0.0,
+          "bedrock_equiv_cost_usd": 2.059893
+        },
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.7625,
+          "strict_accuracy": 0.725,
+          "with_evidence_rate": 0.85,
+          "swar": 0.0875,
+          "swar_uncaveated": 0.05,
+          "wrong_answer_rate": 0.0875,
+          "correct_refusal_rate": 0.7,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0111,
+          "completion_rate": 0.8556,
+          "latency_p50_s": 16.444,
+          "latency_p95_s": 92.248,
+          "avg_llm_calls": 4.33,
+          "avg_input_tokens": 14073,
+          "avg_output_tokens": 1366,
+          "cost_usd": 0.0,
+          "bedrock_equiv_cost_usd": 1.881219
+        }
+      ],
+      "by_level": {
+        "easy": {
+          "n": 90,
+          "execution_accuracy": 0.9222,
+          "swar": 0.0333,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.9556
+        },
+        "defect": {
+          "n": 60,
+          "execution_accuracy": 0.5833,
+          "swar": 0.1167,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.7
+        },
+        "medium": {
+          "n": 90,
+          "execution_accuracy": 0.6667,
+          "swar": 0.1333,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.8
+        },
+        "adversarial": {
+          "n": 30,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.7,
+          "completion_rate": 0.9
+        }
+      },
+      "by_defect": {
+        "D1": {
+          "n": 99,
+          "execution_accuracy": 0.9192,
+          "swar": 0.0404,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.9596
+        },
+        "D2": {
+          "n": 15,
+          "execution_accuracy": 0.7333,
+          "swar": 0.0667,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.8
+        },
+        "D3": {
+          "n": 21,
+          "execution_accuracy": 0.7143,
+          "swar": 0.1429,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.8571
+        },
+        "D4": {
+          "n": 21,
+          "execution_accuracy": 0.7143,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.7143
+        },
+        "D5": {
+          "n": 102,
+          "execution_accuracy": 0.4848,
+          "swar": 0.1818,
+          "correct_refusal_rate": 1.0,
+          "completion_rate": 0.6765
+        },
+        "D6": {
+          "n": 27,
+          "execution_accuracy": 0.8889,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.8889
+        },
+        "D7": {
+          "n": 48,
+          "execution_accuracy": 0.4375,
+          "swar": 0.25,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.6875
+        },
+        "D8": {
+          "n": 6,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.0,
+          "completion_rate": 1.0
+        },
+        "D9": {
+          "n": 3,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 1.0,
+          "completion_rate": 1.0
+        },
+        "D10": {
+          "n": 12,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.5,
+          "completion_rate": 0.75
+        }
+      },
+      "flaky": [
+        {
+          "id": "d021",
+          "passed": 2,
+          "runs": 3
+        },
+        {
+          "id": "e017",
+          "passed": 2,
+          "runs": 3
+        },
+        {
+          "id": "e018",
+          "passed": 2,
+          "runs": 3
+        },
+        {
+          "id": "e030",
+          "passed": 1,
+          "runs": 3
+        },
+        {
+          "id": "m025",
+          "passed": 1,
+          "runs": 3
+        },
+        {
+          "id": "m034",
+          "passed": 2,
+          "runs": 3
+        }
+      ]
+    }
+  }
+}
