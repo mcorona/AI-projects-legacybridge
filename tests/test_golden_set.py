@@ -103,12 +103,12 @@ def test_gold_sql_executes_against_seed(q):
 def test_naive_answer_differs_from_gold(q):
     """La pregunta discrimina: ignorar el defecto produce un resultado distinto."""
     from legacybridge.mcp_servers.sql_readonly import ReadOnlyExecutor
-    from scripts.agent_check import result_sets_match
+    from evals.compare import results_match
 
     db = ReadOnlyExecutor()
     gold, naive = db.run(q["gold_sql"], max_rows=200), db.run(q["naive_sql"], max_rows=200)
     if gold.get("stage") == "connection":
         pytest.skip("Postgres legacy no disponible (make db)")
     assert gold["ok"] and naive["ok"], (gold, naive)
-    assert not result_sets_match(gold["columns"], gold["rows"], naive["columns"], naive["rows"]), \
+    assert not results_match(gold["columns"], gold["rows"], naive["columns"], naive["rows"]), \
         f"{q['id']}: la respuesta ingenua coincide con la de referencia"

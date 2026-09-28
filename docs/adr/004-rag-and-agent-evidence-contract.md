@@ -66,7 +66,7 @@ arranque.
   el loop explícito deja cada paso en la traza y se mapea 1:1 a Bedrock Agents / AgentCore.
 
 ## Consecuencias
-- (+) Cada respuesta trae SQL ejecutada, filas y tablas verificables; `scripts/agent_check.py`
+- (+) Cada respuesta trae SQL ejecutada, filas y tablas verificables; `scripts/agent_check.py` (sustituido por `evals/run.py`, ADR-005)
   compara result sets contra `gold_sql` (execution accuracy tolerante).
 - (+) El índice no filtra la existencia de tablas restringidas y no mezcla espacios vectoriales.
 - (−) La confianza del modelo local tiende a 1.0; hasta la Fase 5 solo baja por señales objetivas.

@@ -32,9 +32,9 @@ index:
 ask:
 	@. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m legacybridge.agent $(if $(P),--provider $(P)) "$(Q)"
 
-# Fase 2: agente sobre el golden set (evidencia + result set). ARGS="--all -p local --out evals/reports/x.md"
+# Corrida rápida de trabajo sobre dev (antes scripts/agent_check.py). ARGS extra, p. ej. ARGS="--ids e001,d003"
 agent-check:
-	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.agent_check $(ARGS)
+	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m evals.run --split dev -p local --scratch $(ARGS)
 
 smoke:
 	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.smoke_llm $(ARGS)
