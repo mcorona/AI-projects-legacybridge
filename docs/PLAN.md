@@ -12,7 +12,7 @@ Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL 
       `get_business_rule(term)` leyendo `config/business_dictionary.yaml`.
 - [x] `sql_readonly`: `run_query(sql)` → valida con `sql_guard` → ejecuta con `lb_ro`
       con `statement_timeout=5s` → devuelve filas + SQL normalizada.
-- [ ] Registrar ambos en `.mcp.json` y probar desde Claude Code y MCP Inspector.
+- [x] Registrar ambos en `.mcp.json` y probar desde Claude Code y MCP Inspector.
 - **Aceptación:** 100% de pruebas de `tests/test_sql_guard.py`; herramientas visibles en Inspector.
 
 ## Fase 2 — RAG + agente (semana 2)

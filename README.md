@@ -3,7 +3,7 @@
 **An AI agent that safely answers business questions over legacy enterprise databases through MCP —
 with verifiable evidence, reproducible evaluation, and a cost-aware model cascade.**
 
-> Status: ✅ Phase 0 · 🚧 Phase 1 — MCP servers implemented and tested; pending Claude Code verification.
+> Status: ✅ Phase 0 · ✅ Phase 1 (MCP servers) · 🚧 Phase 2 — RAG + agent.
 
 ## Why
 Critical business data still lives in decades-old ERPs: cryptic table names, no foreign keys,
