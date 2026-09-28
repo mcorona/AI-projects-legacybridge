@@ -92,10 +92,13 @@ def _call_openai_compat(cfg: dict, messages: list[dict], system: str | None, **k
 
 def _call_bedrock(cfg: dict, messages: list[dict], system: str | None, **kw):
     import boto3
+    from botocore.config import Config
 
     session = boto3.Session(profile_name=os.environ.get("AWS_PROFILE"),
                             region_name=os.environ.get("AWS_REGION", "us-east-1"))
-    client = session.client("bedrock-runtime")
+    # Reintentos adaptativos: absorben ThrottlingException sin escalar en falso.
+    client = session.client("bedrock-runtime",
+                            config=Config(retries={"max_attempts": 5, "mode": "adaptive"}))
     model = os.environ[cfg["model_env"]]
     req = {
         "modelId": model,
