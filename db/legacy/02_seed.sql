@@ -1,4 +1,4 @@
--- Datos semilla mínimos para el smoke test. La Fase 1 agrega scripts/gen_data.py (miles de filas).
+-- Filas ANCLA (smoke test, pruebas y golden set). `make seed` (scripts/gen_data.py) las recarga y agrega miles de filas deterministas.
 INSERT INTO cliemae VALUES
  ('C00001','Aceros del Bajío SA','ABA950101AB1','JAL','S','19970312'),
  ('C00002','Refacciones Norte','RNO880505CD2','NLE','N','19990120'),

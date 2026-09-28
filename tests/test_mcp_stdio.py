@@ -16,7 +16,8 @@ EXPECTED_TOOLS = {
 }
 PROBE = {
     "legacybridge-schema": ("describe_table", {"table": "pedenc"}),
-    "legacybridge-sql": ("run_query", {"sql": "SELECT COUNT(*) FROM cliemae WHERE cliact = 'S'"}),
+    "legacybridge-sql": ("run_query", {"sql": "SELECT COUNT(*) FROM cliemae WHERE cliact = 'S' "
+                                              "AND clicve IN ('C00001','C00002','C00003')"}),
 }
 
 

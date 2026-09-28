@@ -104,7 +104,7 @@ rules:
 
 catalogs:
   artlin: {FE: Ferretería, LA: Lámina, SO: Soldadura}
-  almcve: {"01": Guadalajara, "02": Monterrey}
+  almcve: {"01": Guadalajara, "02": Monterrey, "03": Querétaro}
   pedest: {A: Abierto, C: Cerrado, X: Cancelado, Z: Migrado 1998 (no usar)}
   pedmon: {P: MXN, D: USD}
   artuni: {PZA: Pieza, CJA: Caja (artfac piezas), KG: Kilogramo}

@@ -1,4 +1,4 @@
-.PHONY: setup db db-migrate index ask agent-check test test-unit mcp-dev mcp-check smoke eval
+.PHONY: setup db db-migrate seed index ask agent-check test test-unit mcp-dev mcp-check smoke eval
 
 setup:
 	python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -19,6 +19,10 @@ test:
 
 test-unit:      # sin Postgres
 	. .venv/bin/activate && python -m pytest -q -m "not integration"
+
+# Recarga datos sintéticos deterministas (ancla + generados, seed 42). ARGS="--dry-run" | "--seed 7"
+seed: db
+	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.gen_data $(ARGS)
 
 # Indexa DDL, diccionario y defectos en pgvector (incremental). ARGS="--dry-run" para previsualizar.
 index:

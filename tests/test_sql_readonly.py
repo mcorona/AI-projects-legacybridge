@@ -58,7 +58,8 @@ def ex():
 
 @pytest.mark.integration
 def test_golden_e001_active_customers(ex):
-    out = ex.run("SELECT COUNT(*) FROM cliemae WHERE cliact = 'S'")
+    """Restringida a las filas ancla de 02_seed.sql: independiente del volumen generado."""
+    out = ex.run("SELECT COUNT(*) FROM cliemae WHERE cliact = 'S' AND clicve IN ('C00001','C00002','C00003')")
     assert out["ok"] and out["rows"] == [[1]] and out["tables"] == ["cliemae"]
     assert out["sql"].upper().endswith("LIMIT 100") and out["truncated"] is False
 
@@ -66,7 +67,8 @@ def test_golden_e001_active_customers(ex):
 @pytest.mark.integration
 def test_golden_m001_amount_by_currency(ex):
     out = ex.run("SELECT e.pedmon, SUM(d.detcant*d.detprec) FROM pedenc e JOIN peddet d "
-                 "ON d.pednum=e.pednum WHERE e.pedest IN ('A','C') AND TO_DATE(e.pedfec,'YYYYMMDD') "
+                 "ON d.pednum=e.pednum WHERE e.pednum IN (501,1001,1002,1003) "
+                 "AND e.pedest IN ('A','C') AND TO_DATE(e.pedfec,'YYYYMMDD') "
                  "BETWEEN DATE '2026-09-01' AND DATE '2026-09-30' GROUP BY e.pedmon ORDER BY 1")
     assert out["ok"], out
     assert out["rows"] == [["D", 490], ["P", 7400]]
@@ -76,7 +78,7 @@ def test_golden_m001_amount_by_currency(ex):
 @pytest.mark.integration
 def test_golden_d001_orphans(ex):
     out = ex.run("SELECT x.almcve, x.artcve, x.exicant FROM almexi x LEFT JOIN artmae a "
-                 "ON a.artcve=x.artcve WHERE a.artcve IS NULL")
+                 "ON a.artcve=x.artcve WHERE a.artcve IS NULL AND x.artcve = 'XXX-999'")
     assert out["ok"] and out["columns"] == ["almcve", "artcve", "exicant"]
     assert out["rows"] == [["02", "XXX-999", 5]]
 
