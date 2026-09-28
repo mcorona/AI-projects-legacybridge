@@ -26,9 +26,12 @@ TARGETS = {  # composición objetivo del PLAN (Fase 3): 120 preguntas
 
 
 def load(split: str = "dev") -> list[dict]:
-    """Preguntas de un split ('dev', 'test', 'holdout'); 'all' = dev + test (las 120 del PLAN)."""
+    """Preguntas de un split ('dev', 'test', 'holdout'); 'all' = dev + test (las 120 del PLAN);
+    'adversarial' = las 15 adversariales del golden set (criterio de aceptación de la Fase 4)."""
     if split == "all":
         return [q for s in SPLITS for q in load(s)]
+    if split == "adversarial":
+        return [q for q in load("all") if q["level"] == "adversarial"]
     if split not in SPLITS + EXTRA_SPLITS:
         raise ValueError(f"split inválido: {split}; usa {SPLITS + EXTRA_SPLITS} o 'all'")
     path = QUESTIONS_DIR / f"{split}.jsonl"

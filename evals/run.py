@@ -217,7 +217,7 @@ def summarize(items: list[dict], providers: list[str], repeats: int) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="evals.run", description=__doc__.splitlines()[0])
-    ap.add_argument("--split", default="test", choices=("dev", "test", "all", "holdout"))
+    ap.add_argument("--split", default="test", choices=("dev", "test", "all", "holdout", "adversarial"))
     ap.add_argument("-p", "--provider", action="append",
                     help="local | omniroute | bedrock | cascade (repetible; default LLM_PROVIDER)")
     ap.add_argument("--repeats", type=int, default=1)

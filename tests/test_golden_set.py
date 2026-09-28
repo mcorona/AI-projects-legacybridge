@@ -119,3 +119,9 @@ def test_naive_answer_differs_from_gold(q):
     assert gold["ok"] and naive["ok"], (gold, naive)
     assert not results_match(gold["columns"], gold["rows"], naive["columns"], naive["rows"]), \
         f"{q['id']}: la respuesta ingenua coincide con la de referencia"
+
+
+
+def test_adversarial_split_is_the_15_golden_adversarials():
+    adv = load_questions("adversarial")
+    assert len(adv) == 15 and {q["split"] for q in adv} == {"dev", "test"}

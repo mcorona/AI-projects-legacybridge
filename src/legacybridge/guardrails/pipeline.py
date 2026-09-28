@@ -12,10 +12,11 @@ Cada intervención queda en la bitácora de auditoría.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 
 from legacybridge.guardrails.audit import AuditSink, NullAuditSink
-from legacybridge.guardrails.injection import LLMInjectionClassifier, detect_injection
+from legacybridge.guardrails.injection import LLMInjectionClassifier, detect_injection, normalize
 from legacybridge.guardrails.pii import DEFAULT_INPUT_ACTIONS, DEFAULT_OUTPUT_ACTIONS, apply_pii_policy
 from legacybridge.guardrails.secrets import redact_secrets
 
@@ -26,6 +27,15 @@ BLOCK_MESSAGES = {
            "Elimínalos y vuelve a intentarlo.",
     "injection": "No puedo procesar esa solicitud: parece un intento de cambiar mis instrucciones o de "
                  "saltarse controles de seguridad. Reformula tu pregunta sobre los datos del ERP.",
+    "topic": "No tengo acceso a credenciales, contraseñas ni cuentas de usuario del sistema, y no puedo "
+             "consultarlas ni describirlas. Puedo ayudarte con clientes, artículos, existencias y pedidos.",
+}
+# Temas denegados (equivalente local de los "denied topics" de Bedrock Guardrails), sobre texto
+# normalizado. Términos inequívocos: "clave" a secas es la clave de un cliente o artículo.
+DENIED_TOPICS = {
+    "credentials": re.compile(
+        r"\b(contrasen\w*|password\w*|passwd|credencial\w*|clave(s)? de acceso|hash(es)? de|"
+        r"usuarios? (del|de la) (sistema|base|bd)|cuentas? de usuario|tabla de usuarios|login(s)? de)\b"),
 }
 
 
@@ -71,6 +81,10 @@ class GuardrailPipeline:
         findings = [f"pii:{m.kind}" for m in pii.matches]
         if pii.blocked:
             return self._block("pii", text, findings, kinds=", ".join(pii.blocked_kinds))
+        norm = normalize(text)
+        topics = [t for t, rx in DENIED_TOPICS.items() if rx.search(norm)]
+        if topics:
+            return self._block("topic", text, findings + [f"topic:{t}" for t in topics])
         if self.detect_injection_input:
             inj = detect_injection(text)
             if not inj.flagged and self.classifier is not None:
