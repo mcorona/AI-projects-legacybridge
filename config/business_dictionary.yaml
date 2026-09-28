@@ -78,10 +78,10 @@ joins:
 
 rules:
   cliente_activo:
-    text: "cliact = 'S'  (NULL cuenta como inactivo)"
+    text: "activo: cliact = 'S'. inactivo: COALESCE(cliact,'N') <> 'S' (NULL cuenta como inactivo; cliact <> 'S' NO incluye los NULL)"
     terms: [activo, activos, inactivo, vigente]
   articulo_vigente:
-    text: "COALESCE(artbaja,'N') = 'N'"
+    text: "vigente: COALESCE(artbaja,'N') = 'N'. dado de baja: artbaja = 'S'"
     terms: [vigente, baja, descontinuado, activo]
   pedido_valido:
     text: "pedest IN ('A','C')  -- excluir X (cancelado) y Z (migrado 1998)"
