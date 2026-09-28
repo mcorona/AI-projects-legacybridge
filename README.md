@@ -3,7 +3,7 @@
 **An AI agent that safely answers business questions over legacy enterprise databases through MCP —
 with verifiable evidence, reproducible evaluation, and a cost-aware model cascade.**
 
-> Status: 🚧 Phase 0 — scaffold, SQL guard, multi-provider LLM layer.
+> Status: ✅ Phase 0 complete (environment + provider smoke test) · 🚧 Phase 1 — MCP servers.
 
 ## Why
 Critical business data still lives in decades-old ERPs: cryptic table names, no foreign keys,
@@ -25,7 +25,7 @@ User ─► Agent ─► LLM router ─┬─► Qwen3.6 (LM Studio, local, $0)
 | Capability | Status |
 |---|---|
 | AST-based SQL guard (SELECT-only, allowlist, no catalogs, forced LIMIT) | ✅ |
-| Multi-provider LLM layer with cost/latency tracking | ✅ |
+| Multi-provider LLM layer with cost/latency tracking and honest cascade escalation (ADR-002) | ✅ |
 | MCP servers (schema explorer, read-only SQL) | 🧪 |
 | Legacy defect catalog (10 intentional defects) | ✅ |
 | Agent with self-correction and evidence | ⏳ |
