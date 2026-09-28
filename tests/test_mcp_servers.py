@@ -34,9 +34,21 @@ def _assert_read_only(tools: dict):
 
 def test_schema_server_exposes_read_only_tools():
     tools = _tools(schema_explorer.build_server())
-    assert {"list_tables", "describe_table", "get_business_rule"} <= set(tools)
+    assert set(tools) == {"list_tables", "describe_table", "find_columns", "get_business_rule"}
     _assert_read_only(tools)
     assert tools["describe_table"].input_schema["required"] == ["table"]
+    fc = tools["find_columns"].input_schema
+    assert fc["required"] == ["concept"] and fc["properties"]["limit"]["default"] == 8
+    assert fc["properties"]["limit"]["maximum"] == 25
+    assert fc["properties"]["concept"]["description"]
+
+
+def test_schema_server_tools_delegate_to_explorer():
+    server = schema_explorer.build_server(schema_explorer.SchemaExplorer(db_columns=None))
+    out = _call(server, "find_columns", {"concept": "moneda", "limit": 1})
+    assert [(m["table"], m["column"]) for m in out["matches"]] == [("pedenc", "pedmon")]
+    assert _call(server, "get_business_rule", {"term": "pedido válido"})["matched"] is True
+    assert _call(server, "describe_table", {"table": "usupwd"})["error"] == "table_not_allowed"
 
 
 def test_sql_server_exposes_only_run_query():
