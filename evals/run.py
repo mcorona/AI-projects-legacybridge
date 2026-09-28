@@ -28,7 +28,7 @@ from pathlib import Path
 
 from evals.compare import catalog_aliases, results_match
 from evals.dataset import QUESTIONS_DIR, load
-from evals.metrics import (SWAR_CONFIDENCE, adversarial_ok, aggregate, breakdown, item_stability,
+from evals.metrics import (FINISHED, SWAR_CONFIDENCE, adversarial_ok, aggregate, breakdown, item_stability,
                            leaks, run_metrics)
 from evals.report import render_markdown
 
@@ -50,7 +50,7 @@ def score_item(q: dict, r, gold: dict | None, price: tuple[float, float], provid
     """Registro plano de una pregunta evaluada (una línea del JSONL crudo)."""
     ev = r.primary_evidence
     tables = sorted({t for e in r.evidence for t in e.tables})
-    finished = r.stop_reason in ("submitted", "answer_without_submit")
+    finished = r.stop_reason in FINISHED
     match = match_strict = False
     if q["level"] != "adversarial" and finished and ev is not None and gold and gold.get("ok"):
         om = bool(q.get("order_matters"))
@@ -70,7 +70,7 @@ def score_item(q: dict, r, gold: dict | None, price: tuple[float, float], provid
         "input_tokens": r.input_tokens, "output_tokens": r.output_tokens,
         "latency_s": r.latency_s, "cost_usd": round(r.cost_usd, 6),
         "bedrock_equiv_cost_usd": round((r.input_tokens * price[0] + r.output_tokens * price[1]) / 1e6, 6),
-        "providers_used": r.providers, "tables": tables,
+        "providers_used": r.providers, "tables": tables, "guardrail_findings": r.guardrail_findings,
         "sql": ev.sql if ev else None, "row_count": ev.row_count if ev else None,
         "answer": r.answer[:500],
         # traza compacta para diagnosticar fallos sin volver a correr el agente

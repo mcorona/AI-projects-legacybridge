@@ -22,7 +22,7 @@ def render(r: AgentResult) -> str:
            + f"  stop={r.stop_reason}"]
     if r.caveats:
         out += ["\nAdvertencias:"] + [f"  - {c}" for c in r.caveats]
-    ev = r.primary_evidence
+    ev = r.primary_public_evidence
     if ev:
         out += ["\nEvidencia:", f"  SQL: {ev.sql}", f"  Tablas: {', '.join(ev.tables)}",
                 f"  Filas: {ev.row_count}{' (truncado)' if ev.truncated else ''}"]
@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
 
     r = Agent(provider=args.provider).ask(" ".join(args.question))
     print(json.dumps(r.to_dict(), ensure_ascii=False, indent=2, default=str) if args.json else render(r))
-    return 0 if r.stop_reason == "submitted" else 1
+    return 0 if r.stop_reason in ("submitted", "blocked_input") else 1
 
 
 if __name__ == "__main__":

@@ -6,6 +6,12 @@ from legacybridge.agent.core import AgentResult, QueryEvidence, Step
 
 
 def result(rows=12):
+    r = _result(rows)
+    r.public_evidence = r.evidence
+    return r
+
+
+def _result(rows):
     return AgentResult(
         "¿Cuántos?", answer="Hay 1 cliente activo.", outcome="answer", confidence=0.8,
         model_confidence=0.9, caveats=["NULL = inactivo (D4)"], stop_reason="submitted",

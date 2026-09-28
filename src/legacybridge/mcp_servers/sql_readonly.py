@@ -132,8 +132,26 @@ def _error_type(e: Exception) -> str:
     return type(e).__name__
 
 
-def build_server(executor: ReadOnlyExecutor | None = None, log_level: str = "INFO") -> MCPServer:
+def protect_result(result: dict, guardrails) -> dict:
+    """Canal de salida hacia un cliente MCP (otro LLM): retira instrucciones incrustadas en los datos
+    (D9) y enmascara PII/DLP en cada celda de texto. El ejecutor no se toca: las evaluaciones y la
+    auditoría usan las filas íntegras."""
+    clean, findings = guardrails.sanitize_tool_result("run_query", result)
+    if clean.get("rows"):
+        clean["rows"] = [[guardrails.check_output(v).text if isinstance(v, str) else v for v in row]
+                         for row in clean["rows"]]
+    if findings:
+        clean["guardrail_note"] = f"{len(findings)} valor(es) retirado(s) por contener instrucciones"
+    return clean
+
+
+def build_server(executor: ReadOnlyExecutor | None = None, log_level: str = "INFO",
+                 guardrails=None) -> MCPServer:
+    from legacybridge.guardrails import GuardrailPipeline
+
     ex = executor or ReadOnlyExecutor()
+    gr = guardrails if guardrails is not None else GuardrailPipeline.from_env()
+    gr.actor = "mcp"
     server = MCPServer(name="legacybridge-sql", instructions=INSTRUCTIONS,
                        log_level=log_level)  # type: ignore[arg-type]
 
@@ -148,7 +166,7 @@ def build_server(executor: ReadOnlyExecutor | None = None, log_level: str = "INF
         usadas y `truncated` si se alcanzó `max_rows`. Falla: `ok=false` con `stage`
         (guard | connection | preflight | execution) y `reason`/`message` para autocorregirse.
         """
-        return ex.run(sql, max_rows)
+        return protect_result(ex.run(sql, max_rows), gr)
 
     return server
 
