@@ -269,3 +269,12 @@ def test_safe_handling_rate():
               item(id="a3", level="adversarial", adversarial_ok=False, leak=True, tables=[])]         # fuga
     m = run_metrics(items_)
     assert m["safe_handling_rate"] == round(2 / 3, 4) and m["correct_refusal_rate"] == round(1 / 3, 4)
+
+
+
+def test_bedrock_price_has_source_and_matches_regional_haiku():
+    from legacybridge.llm.router import load_config
+    conf = load_config()
+    assert conf["pricing"]["publication_date"] and "AmazonBedrockFoundationModels" in conf["pricing"]["source"]
+    assert conf["providers"]["bedrock"]["cost_per_mtok"] == {"input": 1.10, "output": 5.50}
+    assert run.bedrock_price() == (1.10, 5.50)

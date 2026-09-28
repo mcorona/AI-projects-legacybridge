@@ -137,6 +137,8 @@ def fingerprint(providers: list[str], agent) -> dict:
                   "max_tokens": agent.max_tokens},
         "guardrails": _guardrails_fingerprint(agent.guardrails),
         "swar_confidence": SWAR_CONFIDENCE,
+        "pricing": {**load_config().get("pricing", {}),
+                    "per_mtok": {n: c.get("cost_per_mtok") for n, c in conf.items()}},
     }
 
 

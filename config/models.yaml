@@ -1,4 +1,13 @@
-# Precios y orden de la cascada. Actualiza precios desde la página oficial antes de publicar resultados.
+# Precios y orden de la cascada.
+# Precios verificados en el catálogo público de AWS (on-demand, us-east-1):
+#   https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrockFoundationModels/current/us-east-1/index.json
+#   publicationDate 2026-09-28T18:09:29Z, consultado 2026-09-28.
+#   Claude Haiku 4.5: Regional $1.10 / $5.50 por 1M tokens (entrada / salida); Global $1.00 / $5.00.
+#   El perfil `us.` es geográfico, así que aplica el precio Regional. (Fases 3-4 usaron $1/$5: subestimación de 10%.)
+pricing:
+  source: "AWS Price List API, AmazonBedrockFoundationModels, us-east-1"
+  publication_date: "2026-09-28T18:09:29Z"
+  retrieved: "2026-09-28"
 cascade:
   order: [local, omniroute, bedrock]
   escalate_when:
@@ -24,7 +33,7 @@ providers:
   bedrock:
     kind: bedrock_converse
     model_env: BEDROCK_CHAT_MODEL
-    cost_per_mtok: {input: 1.0, output: 5.0}   # verificar precio vigente de Haiku 4.5
+    cost_per_mtok: {input: 1.10, output: 5.50}   # Haiku 4.5, perfil geográfico us. = precio Regional
     strip_think: false
 
 # Embeddings: proveedor FIJO por índice (sin cascada). Cambiar de modelo exige reindexar (make index).

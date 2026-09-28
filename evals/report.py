@@ -120,6 +120,10 @@ def render_markdown(results: dict, items: list[dict]) -> str:
             f"| Agente | max_steps={fp['agent']['max_steps']}, reintentos SQL={fp['agent']['max_sql_retries']}, "
             f"max_tokens={fp['agent']['max_tokens']} |",
             f"| Umbral SWAR | confianza ≥ {fp['swar_confidence']} |",
+            *([f"| Precios (USD / 1M tokens) | " + ", ".join(f"{p}={v['input']}/{v['output']}" for p, v in
+                                                        fp["pricing"]["per_mtok"].items() if v) +
+               f" · fuente: {fp['pricing'].get('source', '—')} ({fp['pricing'].get('publication_date', '—')}) |"]
+              if "pricing" in fp else []),
             *([f"| Guardrails | `{fp['guardrails']['sha']}` · {fp['guardrails']['type']} · clasificador LLM="
                f"{'sí' if fp['guardrails']['llm_classifier'] else 'no'} · Bedrock={'sí' if fp['guardrails']['bedrock'] else 'no'} |"]
               if "guardrails" in fp else []), "",
