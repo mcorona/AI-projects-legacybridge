@@ -316,3 +316,27 @@ def test_telemetry_record_has_breakdown_and_no_question_text():
     assert rec["cost_bedrock_equiv_usd"] == pytest.approx((200 * 1.10 + 40 * 5.50) / 1e6)
     s = summarize(sink.records)
     assert s["turns"] == 1 and s["outcomes"] == {"answer": 1} and s["providers_calls"] == {"local": 2}
+
+
+
+# ---------------------------------------------------------------- evidencia señalada (Fase 5)
+
+SECOND = {**OK_ROWS, "sql": "SELECT COUNT(*) FROM almexi LIMIT 100", "rows": [[99]]}
+
+
+def test_model_can_point_to_an_earlier_query_as_evidence():
+    script = Script([call("run_query", sql="a")], [call("run_query", sql="b")],
+                    [call("submit_answer", answer="Hay 1.", outcome="answer", confidence=0.9, evidence_query=1)])
+    r = agent(script, tb=toolbox([OK_ROWS, SECOND])).ask("q")
+    assert r.primary_evidence.rows == [[1]] and r.primary_public_evidence.rows == [[1]]
+    assert '"query_id": 2' in script.seen[2]["messages"][-1]["content"]
+
+
+@pytest.mark.parametrize("pointer", [None, 7, 0, "x"])
+def test_invalid_or_missing_pointer_falls_back_to_last_query(pointer):
+    args = dict(answer="Hay 99.", outcome="answer", confidence=0.9)
+    if pointer is not None:
+        args["evidence_query"] = pointer
+    script = Script([call("run_query", sql="a")], [call("run_query", sql="b")], [call("submit_answer", **args)])
+    r = agent(script, tb=toolbox([OK_ROWS, SECOND])).ask("q")
+    assert r.primary_evidence.rows == [[99]]

@@ -33,6 +33,9 @@ SUBMIT_ANSWER = {
                            "description": "Confianza en que la respuesta es correcta y completa"},
             "caveats": {"type": "array", "items": {"type": "string"},
                         "description": "Advertencias: huérfanos, monedas mezcladas, datos truncados, supuestos"},
+            "evidence_query": {"type": "integer", "minimum": 1,
+                               "description": "query_id de la consulta de run_query cuyas filas sustentan la "
+                                              "respuesta (si ejecutaste varias; por omisión, la última)"},
         },
         "required": ["answer", "outcome", "confidence"],
     },

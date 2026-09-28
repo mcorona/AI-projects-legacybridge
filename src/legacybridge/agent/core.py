@@ -7,7 +7,8 @@ Flujo esperado: explorar esquema -> SQL -> validar (guard) -> ejecutar -> respon
 - Autocorrección: si `run_query` falla (guard o BD), el error vuelve al modelo como dato;
   se permiten `max_sql_retries` (2) reintentos; a la siguiente falla el agente se detiene.
 - Evidencia: la registra el loop con cada `run_query` exitoso (SQL ejecutada, filas, tablas);
-  el modelo no puede fabricarla. La principal es la última antes de `submit_answer`.
+  el modelo no puede fabricarla. La principal es la que el modelo señala en `submit_answer`
+  (`evidence_query`, entre las que el loop registró) o, por omisión, la última (ADR-007).
 - Confianza: la reporta el modelo y el loop la ajusta a la baja con señales objetivas
   (reintentos, cero filas, resultado truncado, respuesta sin evidencia).
 - Guardrails (Fase 4, ADR-006): la entrada se revisa antes de llegar al modelo (inyección directa,
@@ -42,9 +43,11 @@ Cómo trabajar:
    - D5 pedidos válidos: solo pedest IN ('A','C').
    - D6 unidades: convierte cajas a piezas con artfac; nunca sumes KG con piezas.
    - D7 moneda: agrupa por pedmon; nunca sumes MXN con USD.
-4. Ejecuta un único SELECT con run_query. Si falla, lee `stage` y `reason`/`message`, corrige y reintenta.
+4. Ejecuta un único SELECT con run_query. Si falla, lee `stage` y `reason`/`message` (y `suggestions`),
+   corrige y reintenta. Cada consulta exitosa trae un `query_id`.
 5. Termina SIEMPRE con submit_answer: respuesta en español, breve, con las cifras exactas de run_query,
-   el outcome correcto, tu confianza (0-1) y advertencias (huérfanos, monedas, supuestos).
+   el outcome correcto, tu confianza (0-1), advertencias (huérfanos, monedas, supuestos) y, si ejecutaste
+   varias consultas, `evidence_query` con el query_id de la que responde la pregunta.
 
 Reglas:
 - Toda cifra sale de run_query. No inventes datos. Si no puedes obtenerlos, outcome='cannot_answer'.
@@ -118,14 +121,22 @@ class AgentResult:
     # evidencia para mostrar: mismas consultas con PII/DLP aplicados a cada celda de texto
     public_evidence: list[QueryEvidence] = field(default_factory=list)
 
+    evidence_index: int | None = None      # consulta que sustenta la respuesta (0-based); None = la última
+
+    def _pick(self, items: list) -> QueryEvidence | None:
+        if not items:
+            return None
+        i = self.evidence_index
+        return items[i] if i is not None and 0 <= i < len(items) else items[-1]
+
     @property
     def primary_evidence(self) -> QueryEvidence | None:
         """Evidencia íntegra (uso interno: evaluación y auditoría)."""
-        return self.evidence[-1] if self.evidence else None
+        return self._pick(self.evidence)
 
     @property
     def primary_public_evidence(self) -> QueryEvidence | None:
-        return self.public_evidence[-1] if self.public_evidence else None
+        return self._pick(self.public_evidence)
 
     def to_dict(self) -> dict:
         """Representación EXTERNA: solo evidencia enmascarada."""
@@ -286,7 +297,7 @@ class Agent:
             if ok:
                 res.evidence.append(QueryEvidence(out["sql"], out.get("tables", []), out["columns"],
                                                   out["rows"], out["row_count"], out["truncated"]))
-                out = self._rows_for_model(out)
+                out = {"query_id": len(res.evidence), **self._rows_for_model(out)}
             else:
                 res.sql_failures += 1
                 out = {**out, "retries_left": max(0, self.max_sql_retries - res.sql_failures + 1)}
@@ -318,8 +329,15 @@ class Agent:
             res.model_confidence = min(1.0, max(0.0, float(args.get("confidence", 0.5))))
         except (TypeError, ValueError):
             res.model_confidence = 0.5
+        try:     # el modelo SEÑALA una consulta ya registrada; no puede aportar filas propias
+            qid = int(args["evidence_query"]) if args.get("evidence_query") is not None else None
+        except (TypeError, ValueError):
+            qid = None
+        if qid is not None and 1 <= qid <= len(res.evidence):
+            res.evidence_index = qid - 1
         res.confidence = calibrate(res)
-        res.steps.append(Step("submit_answer", {"outcome": res.outcome}, True, 0.0, res.outcome))
+        res.steps.append(Step("submit_answer", {"outcome": res.outcome, "evidence_query": qid}, True, 0.0,
+                              res.outcome))
 
     def _account(self, res: AgentResult, r: LLMResult) -> None:
         res.llm_calls += 1
