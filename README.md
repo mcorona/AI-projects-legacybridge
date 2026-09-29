@@ -3,7 +3,7 @@
 **An AI agent that safely answers business questions over legacy enterprise databases through MCP —
 with verifiable evidence, reproducible evaluation, and a cost-aware model cascade.**
 
-> Status: ✅ Phases 0–4 (MCP servers, RAG + agent, evaluation, guardrails) · 🚧 Phase 5 — cost cascade & observability.
+> Status: ✅ Phases 0–4 · ◐ Phase 5 (cascade + telemetry built; Bedrock benchmark pending an AWS account block) · 🚧 Phase 6 — publication.
 
 ## Why
 Critical business data still lives in decades-old ERPs: cryptic table names, no foreign keys,
@@ -35,20 +35,22 @@ User ─► Agent ─► LLM router ─┬─► Qwen3.6 (LM Studio, local, $0)
 | Deterministic synthetic ERP data with every legacy defect seeded | ✅ |
 | Layered guardrails: direct/indirect prompt injection (incl. base64 and zero-width tricks), denied topics, output DLP, PII masking (Mexican formats), append-only audit log, optional Bedrock Guardrails — ADR-006 | ✅ |
 | Human-in-the-loop write proposals: validated, confirmed, reviewed — never executed | ✅ |
-| Cost cascade benchmark (local vs cloud) | ⏳ |
+| Answer-level cost cascade (local Qwen → Bedrock Haiku) with escalation policy, per-turn telemetry (latency by stage, cost), verified AWS pricing — ADR-007 | ✅ |
+| Cost cascade benchmark vs Bedrock-only | ⏳ pending AWS |
 
-## Results (Phase 3, held-out test split)
-90 questions × 3 runs, local Qwen3.6-35B-A3B on LM Studio, $0 (≈ $1.95 per run at Bedrock Haiku prices).
-Full reports with reproducibility fingerprint: [`evals/reports/`](evals/reports/).
+## Results (held-out test split, latest code)
+90 questions × 3 runs, local Qwen3.6-35B-A3B on LM Studio, **$0** (≈ $2.37 per run at verified Bedrock
+Haiku 4.5 prices). Full reports with reproducibility fingerprint: [`evals/reports/`](evals/reports/).
 
-| Metric | Value |
-|---|---|
-| Execution accuracy (result sets, not SQL text) | **77.9%** [75.0–80.0] |
-| SWAR — silent wrong answers (wrong, delivered with confidence ≥ 0.6) | **5.4%** [5.0–6.2] |
-| Correct refusals on adversarial prompts / false refusals | 80% / 0% |
-| Sensitive-name leaks | 0% |
-| Runs completed | 84.1% |
-| Latency p50 / p95 | 16 s / 92 s |
+| Metric | Local Qwen (×3) | OmniRoute free tier (×1) | Phase 3 baseline |
+|---|---|---|---|
+| Execution accuracy (result sets, not SQL text) | **95.4%** [95.0–96.2] | 88.8% | 77.9% |
+| SWAR — silent wrong answers (wrong, confidence ≥ 0.6) | **3.8%** [2.5–5.0] | 11.2% | 5.4% |
+| Correct refusals on adversarial prompts / false refusals | 76.7% / 0% | 70.0% / 0% | 80% / 0% |
+| Runs completed | 97.0% | 100% | 84.1% |
+| Latency p50 / p95 | 19 s / 43 s | 17 s / 28 s | 16 s / 92 s |
+
+By level (local): easy 100% · joins & rules 96.7% · legacy-defect traps 86.7%.
 
 **Security (Phase 4)** — adversarial prompts, 3 runs each:
 
@@ -59,9 +61,9 @@ Full reports with reproducibility fingerprint: [`evals/reports/`](evals/reports/
 
 With guardrails on, the test split keeps 0% false refusals (83.8% execution accuracy, single run).
 
-By level: easy 95.6% · joins & rules 73.3% · legacy-defect traps 58.3%. Hardest defects: mixed
-currencies (D7) and magic status codes (D5). Figures are after a documented measurement fix
-(original run: 74.2% / 9.2% SWAR); see ADR-005.
+Phase 3 figures are after a documented measurement fix (original run: 74.2% / 9.2% SWAR; ADR-005).
+The Bedrock-only and cascade benchmark (Phase 5 target: cascade ≥ 95% of Bedrock accuracy at ≤ 20% of
+its cost) is pending an AWS account-level Bedrock block; see ADR-007.
 
 ## MCP tools
 | Server | Tool | Purpose |
@@ -86,6 +88,8 @@ make ask Q="How many active customers are there?"   # answer + evidence + trace 
 make seed           # deterministic synthetic data (seed 42) with every defect seeded
 make eval           # official evaluation: test split × 3 (≈ 1.5 h local); ARGS="--split dev --scratch" for quick runs
 make proposals      # human review of change proposals (the agent never executes writes)
+make ask P=cascade Q="..."   # answer-level cascade: local Qwen, Bedrock only if needed
+make telemetry      # per-turn latency by stage, tokens, cost, escalations
 make mcp-dev SERVER=schema   # or SERVER=sql — MCP Inspector UI
 claude              # then run /kickoff
 ```
