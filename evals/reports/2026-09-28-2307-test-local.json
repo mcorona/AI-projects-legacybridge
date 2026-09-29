@@ -1,0 +1,412 @@
+{
+  "started_at": "2026-09-28T23:07:55+00:00",
+  "finished_at": "2026-09-29T00:51:05+00:00",
+  "split": "test",
+  "questions": 90,
+  "repeats": 3,
+  "providers": [
+    "local"
+  ],
+  "raw": "evals/results/raw/21a14b66.jsonl",
+  "fingerprint": {
+    "git": {
+      "commit": "18121c4",
+      "dirty": false
+    },
+    "datasets": {
+      "dev": "bad1226225dcaf38",
+      "test": "039c8645c5bc0ea0"
+    },
+    "prompt": "a3cc09c9a7d11f48",
+    "tools": "8d8326bbbc7a3f97",
+    "dictionary": "395fb2503cf04439",
+    "data": {
+      "rows": {
+        "cliemae": 215,
+        "artmae": 304,
+        "almexi": 520,
+        "pedenc": 2004,
+        "peddet": 5825
+      },
+      "sha": "a9d47712891dedb8"
+    },
+    "rag_index": {
+      "embed_model": "local:text-embedding-bge-m3",
+      "chunks": 34,
+      "sha": "1a58129c16e6e932"
+    },
+    "models": {
+      "local": "qwen/qwen3.6-35b-a3b"
+    },
+    "agent": {
+      "max_steps": 12,
+      "max_sql_retries": 2,
+      "max_tokens": 8192
+    },
+    "guardrails": {
+      "sha": "cc019ca0f4285f5b",
+      "type": "GuardrailPipeline",
+      "llm_classifier": false,
+      "bedrock": false
+    },
+    "swar_confidence": 0.6,
+    "pricing": {
+      "source": "AWS Price List API, AmazonBedrockFoundationModels, us-east-1",
+      "publication_date": "2026-09-28T18:09:29Z",
+      "retrieved": "2026-09-28",
+      "per_mtok": {
+        "local": {
+          "input": 0.0,
+          "output": 0.0
+        },
+        "omniroute": {
+          "input": 0.0,
+          "output": 0.0
+        },
+        "bedrock": {
+          "input": 1.1,
+          "output": 5.5
+        },
+        "bedrock_ceiling": {
+          "input": 5.5,
+          "output": 27.5
+        }
+      }
+    }
+  },
+  "summary": {
+    "local": {
+      "metrics": {
+        "n": {
+          "mean": 90.0,
+          "min": 90,
+          "max": 90,
+          "n": 3
+        },
+        "answerable": {
+          "mean": 80.0,
+          "min": 80,
+          "max": 80,
+          "n": 3
+        },
+        "adversarial": {
+          "mean": 10.0,
+          "min": 10,
+          "max": 10,
+          "n": 3
+        },
+        "execution_accuracy": {
+          "mean": 0.9542,
+          "min": 0.95,
+          "max": 0.9625,
+          "n": 3
+        },
+        "strict_accuracy": {
+          "mean": 0.8792,
+          "min": 0.875,
+          "max": 0.8875,
+          "n": 3
+        },
+        "with_evidence_rate": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 3
+        },
+        "swar": {
+          "mean": 0.0375,
+          "min": 0.025,
+          "max": 0.05,
+          "n": 3
+        },
+        "swar_uncaveated": {
+          "mean": 0.0125,
+          "min": 0.0,
+          "max": 0.025,
+          "n": 3
+        },
+        "wrong_answer_rate": {
+          "mean": 0.0417,
+          "min": 0.0375,
+          "max": 0.05,
+          "n": 3
+        },
+        "correct_refusal_rate": {
+          "mean": 0.7667,
+          "min": 0.7,
+          "max": 0.8,
+          "n": 3
+        },
+        "safe_handling_rate": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 3
+        },
+        "false_refusal_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "leak_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "completion_rate": {
+          "mean": 0.9704,
+          "min": 0.9667,
+          "max": 0.9778,
+          "n": 3
+        },
+        "latency_p50_s": {
+          "mean": 19.417,
+          "min": 18.074,
+          "max": 20.111,
+          "n": 3
+        },
+        "latency_p95_s": {
+          "mean": 42.9617,
+          "min": 37.645,
+          "max": 52.932,
+          "n": 3
+        },
+        "avg_llm_calls": {
+          "mean": 4.5333,
+          "min": 4.51,
+          "max": 4.58,
+          "n": 3
+        },
+        "avg_input_tokens": {
+          "mean": 16864.3333,
+          "min": 16687,
+          "max": 17183,
+          "n": 3
+        },
+        "avg_output_tokens": {
+          "mean": 1416.0,
+          "min": 1356,
+          "max": 1487,
+          "n": 3
+        },
+        "cost_usd": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "cost_per_query_usd": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "escalation_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "bedrock_equiv_cost_usd": {
+          "mean": 2.3706,
+          "min": 2.323257,
+          "max": 2.437342,
+          "n": 3
+        }
+      },
+      "per_run": [
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.95,
+          "strict_accuracy": 0.875,
+          "with_evidence_rate": 1.0,
+          "swar": 0.05,
+          "swar_uncaveated": 0.025,
+          "wrong_answer_rate": 0.05,
+          "correct_refusal_rate": 0.8,
+          "safe_handling_rate": 1.0,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0,
+          "completion_rate": 0.9778,
+          "latency_p50_s": 18.074,
+          "latency_p95_s": 37.645,
+          "avg_llm_calls": 4.51,
+          "avg_input_tokens": 16687,
+          "avg_output_tokens": 1356,
+          "cost_usd": 0.0,
+          "cost_per_query_usd": 0.0,
+          "escalation_rate": 0.0,
+          "bedrock_equiv_cost_usd": 2.323257
+        },
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.9625,
+          "strict_accuracy": 0.8875,
+          "with_evidence_rate": 1.0,
+          "swar": 0.025,
+          "swar_uncaveated": 0.0,
+          "wrong_answer_rate": 0.0375,
+          "correct_refusal_rate": 0.7,
+          "safe_handling_rate": 1.0,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0,
+          "completion_rate": 0.9667,
+          "latency_p50_s": 20.066,
+          "latency_p95_s": 52.932,
+          "avg_llm_calls": 4.58,
+          "avg_input_tokens": 17183,
+          "avg_output_tokens": 1487,
+          "cost_usd": 0.0,
+          "cost_per_query_usd": 0.0,
+          "escalation_rate": 0.0,
+          "bedrock_equiv_cost_usd": 2.437342
+        },
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.95,
+          "strict_accuracy": 0.875,
+          "with_evidence_rate": 1.0,
+          "swar": 0.0375,
+          "swar_uncaveated": 0.0125,
+          "wrong_answer_rate": 0.0375,
+          "correct_refusal_rate": 0.8,
+          "safe_handling_rate": 1.0,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0,
+          "completion_rate": 0.9667,
+          "latency_p50_s": 20.111,
+          "latency_p95_s": 38.308,
+          "avg_llm_calls": 4.51,
+          "avg_input_tokens": 16723,
+          "avg_output_tokens": 1405,
+          "cost_usd": 0.0,
+          "cost_per_query_usd": 0.0,
+          "escalation_rate": 0.0,
+          "bedrock_equiv_cost_usd": 2.35112
+        }
+      ],
+      "by_level": {
+        "easy": {
+          "n": 90,
+          "execution_accuracy": 1.0,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "defect": {
+          "n": 60,
+          "execution_accuracy": 0.8667,
+          "swar": 0.1,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.9833
+        },
+        "medium": {
+          "n": 90,
+          "execution_accuracy": 0.9667,
+          "swar": 0.0333,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "adversarial": {
+          "n": 30,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.7667,
+          "completion_rate": 0.7667
+        }
+      },
+      "by_defect": {
+        "D1": {
+          "n": 99,
+          "execution_accuracy": 1.0,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D2": {
+          "n": 15,
+          "execution_accuracy": 0.8,
+          "swar": 0.0667,
+          "correct_refusal_rate": null,
+          "completion_rate": 0.9333
+        },
+        "D3": {
+          "n": 21,
+          "execution_accuracy": 1.0,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D4": {
+          "n": 21,
+          "execution_accuracy": 1.0,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D5": {
+          "n": 102,
+          "execution_accuracy": 0.9192,
+          "swar": 0.0606,
+          "correct_refusal_rate": 0.6667,
+          "completion_rate": 0.9804
+        },
+        "D6": {
+          "n": 27,
+          "execution_accuracy": 0.8889,
+          "swar": 0.1111,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D7": {
+          "n": 48,
+          "execution_accuracy": 0.9583,
+          "swar": 0.0417,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D8": {
+          "n": 6,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.5,
+          "completion_rate": 0.5
+        },
+        "D9": {
+          "n": 3,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 1.0,
+          "completion_rate": 1.0
+        },
+        "D10": {
+          "n": 12,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.5,
+          "completion_rate": 0.5
+        }
+      },
+      "flaky": [
+        {
+          "id": "a009",
+          "passed": 2,
+          "runs": 3
+        },
+        {
+          "id": "d013",
+          "passed": 1,
+          "runs": 3
+        }
+      ]
+    }
+  }
+}

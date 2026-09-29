@@ -1,0 +1,351 @@
+{
+  "started_at": "2026-09-29T00:51:06+00:00",
+  "finished_at": "2026-09-29T01:18:40+00:00",
+  "split": "test",
+  "questions": 90,
+  "repeats": 1,
+  "providers": [
+    "omniroute"
+  ],
+  "raw": "evals/results/raw/d741d99b.jsonl",
+  "fingerprint": {
+    "git": {
+      "commit": "6ef921d",
+      "dirty": true
+    },
+    "datasets": {
+      "dev": "bad1226225dcaf38",
+      "test": "039c8645c5bc0ea0"
+    },
+    "prompt": "a3cc09c9a7d11f48",
+    "tools": "8d8326bbbc7a3f97",
+    "dictionary": "395fb2503cf04439",
+    "data": {
+      "rows": {
+        "cliemae": 215,
+        "artmae": 304,
+        "almexi": 520,
+        "pedenc": 2004,
+        "peddet": 5825
+      },
+      "sha": "a9d47712891dedb8"
+    },
+    "rag_index": {
+      "embed_model": "local:text-embedding-bge-m3",
+      "chunks": 34,
+      "sha": "1a58129c16e6e932"
+    },
+    "models": {
+      "omniroute": "auto/best-free"
+    },
+    "agent": {
+      "max_steps": 12,
+      "max_sql_retries": 2,
+      "max_tokens": 8192
+    },
+    "guardrails": {
+      "sha": "cc019ca0f4285f5b",
+      "type": "GuardrailPipeline",
+      "llm_classifier": false,
+      "bedrock": false
+    },
+    "swar_confidence": 0.6,
+    "pricing": {
+      "source": "AWS Price List API, AmazonBedrockFoundationModels, us-east-1",
+      "publication_date": "2026-09-28T18:09:29Z",
+      "retrieved": "2026-09-28",
+      "per_mtok": {
+        "local": {
+          "input": 0.0,
+          "output": 0.0
+        },
+        "omniroute": {
+          "input": 0.0,
+          "output": 0.0
+        },
+        "bedrock": {
+          "input": 1.1,
+          "output": 5.5
+        },
+        "bedrock_ceiling": {
+          "input": 5.5,
+          "output": 27.5
+        }
+      }
+    }
+  },
+  "summary": {
+    "omniroute": {
+      "metrics": {
+        "n": {
+          "mean": 90.0,
+          "min": 90,
+          "max": 90,
+          "n": 1
+        },
+        "answerable": {
+          "mean": 80.0,
+          "min": 80,
+          "max": 80,
+          "n": 1
+        },
+        "adversarial": {
+          "mean": 10.0,
+          "min": 10,
+          "max": 10,
+          "n": 1
+        },
+        "execution_accuracy": {
+          "mean": 0.8875,
+          "min": 0.8875,
+          "max": 0.8875,
+          "n": 1
+        },
+        "strict_accuracy": {
+          "mean": 0.725,
+          "min": 0.725,
+          "max": 0.725,
+          "n": 1
+        },
+        "with_evidence_rate": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 1
+        },
+        "swar": {
+          "mean": 0.1125,
+          "min": 0.1125,
+          "max": 0.1125,
+          "n": 1
+        },
+        "swar_uncaveated": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 1
+        },
+        "wrong_answer_rate": {
+          "mean": 0.1125,
+          "min": 0.1125,
+          "max": 0.1125,
+          "n": 1
+        },
+        "correct_refusal_rate": {
+          "mean": 0.7,
+          "min": 0.7,
+          "max": 0.7,
+          "n": 1
+        },
+        "safe_handling_rate": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 1
+        },
+        "false_refusal_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 1
+        },
+        "leak_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 1
+        },
+        "completion_rate": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 1
+        },
+        "latency_p50_s": {
+          "mean": 17.104,
+          "min": 17.104,
+          "max": 17.104,
+          "n": 1
+        },
+        "latency_p95_s": {
+          "mean": 27.848,
+          "min": 27.848,
+          "max": 27.848,
+          "n": 1
+        },
+        "avg_llm_calls": {
+          "mean": 4.22,
+          "min": 4.22,
+          "max": 4.22,
+          "n": 1
+        },
+        "avg_input_tokens": {
+          "mean": 33129.0,
+          "min": 33129,
+          "max": 33129,
+          "n": 1
+        },
+        "avg_output_tokens": {
+          "mean": 78.0,
+          "min": 78,
+          "max": 78,
+          "n": 1
+        },
+        "cost_usd": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 1
+        },
+        "cost_per_query_usd": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 1
+        },
+        "escalation_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 1
+        },
+        "bedrock_equiv_cost_usd": {
+          "mean": 3.3184,
+          "min": 3.31836,
+          "max": 3.31836,
+          "n": 1
+        }
+      },
+      "per_run": [
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.8875,
+          "strict_accuracy": 0.725,
+          "with_evidence_rate": 1.0,
+          "swar": 0.1125,
+          "swar_uncaveated": 0.0,
+          "wrong_answer_rate": 0.1125,
+          "correct_refusal_rate": 0.7,
+          "safe_handling_rate": 1.0,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0,
+          "completion_rate": 1.0,
+          "latency_p50_s": 17.104,
+          "latency_p95_s": 27.848,
+          "avg_llm_calls": 4.22,
+          "avg_input_tokens": 33129,
+          "avg_output_tokens": 78,
+          "cost_usd": 0.0,
+          "cost_per_query_usd": 0.0,
+          "escalation_rate": 0.0,
+          "bedrock_equiv_cost_usd": 3.31836
+        }
+      ],
+      "by_level": {
+        "easy": {
+          "n": 30,
+          "execution_accuracy": 1.0,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "defect": {
+          "n": 20,
+          "execution_accuracy": 0.8,
+          "swar": 0.2,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "medium": {
+          "n": 30,
+          "execution_accuracy": 0.8333,
+          "swar": 0.1667,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "adversarial": {
+          "n": 10,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.7,
+          "completion_rate": 1.0
+        }
+      },
+      "by_defect": {
+        "D1": {
+          "n": 33,
+          "execution_accuracy": 0.9697,
+          "swar": 0.0303,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D2": {
+          "n": 5,
+          "execution_accuracy": 0.6,
+          "swar": 0.4,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D3": {
+          "n": 7,
+          "execution_accuracy": 1.0,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D4": {
+          "n": 7,
+          "execution_accuracy": 1.0,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D5": {
+          "n": 34,
+          "execution_accuracy": 0.7879,
+          "swar": 0.2121,
+          "correct_refusal_rate": 1.0,
+          "completion_rate": 1.0
+        },
+        "D6": {
+          "n": 9,
+          "execution_accuracy": 0.8889,
+          "swar": 0.1111,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D7": {
+          "n": 16,
+          "execution_accuracy": 0.6875,
+          "swar": 0.3125,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D8": {
+          "n": 2,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.0,
+          "completion_rate": 1.0
+        },
+        "D9": {
+          "n": 1,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 1.0,
+          "completion_rate": 1.0
+        },
+        "D10": {
+          "n": 4,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.5,
+          "completion_rate": 1.0
+        }
+      },
+      "flaky": []
+    }
+  }
+}
