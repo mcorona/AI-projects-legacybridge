@@ -138,6 +138,10 @@ More: `make eval` (official evaluation, test × 3, ~1.5 h locally) · `make agen
 `make proposals` (review change proposals) · `make telemetry` (latency by stage, cost, escalations) ·
 `make mcp-check` / `make mcp-dev SERVER=schema|sql` (MCP Inspector) · `make ask P=cascade Q="..."`.
 
+The container is named `legacybridge-db` (port 5433): a second checkout reuses the running database —
+skip `make db` there and run the other targets with `make -o db <target>`. A fresh volume runs every
+script in `db/legacy/` automatically (schema, roles, RAG store, audit log, proposals).
+
 The MCP servers are registered in [`.mcp.json`](.mcp.json): open the repo in Claude Code and the
 `legacybridge-schema` and `legacybridge-sql` tools are available.
 
