@@ -5,6 +5,10 @@ Uso:
     python -m scripts.demo --scene 3       # una sola escena
     python -m scripts.demo --provider cascade
 
+Con DEMO_CAST=<archivo.json> guarda cada línea impresa con su tiempo y las marcas de escena: el video
+se graba reproduciendo ese registro real con las esperas del modelo comprimidas (scripts/replay_demo.py,
+docs/demo/demo.tape).
+
 Cada escena es una pregunta real al agente (sin respuestas pregrabadas). Se eligieron preguntas que el
 agente resuelve de forma estable según los reportes de evaluación, para que el video muestre el
 comportamiento típico y no un caso afortunado. La escena 6 cancela la propuesta: nada se registra ni se
@@ -13,7 +17,9 @@ ejecuta.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+import os
 import sys
 import textwrap
 import time
@@ -39,16 +45,26 @@ SCENES = [
      "The agent drafts a DELETE, estimates its impact and waits; the demo cancels it — nothing runs."),
 ]
 WIDTH = 96
+_CAST: list[dict] = []
+_T0 = time.perf_counter()
+
+
+def _out(text: str = "") -> None:
+    """Imprime y registra la línea con su tiempo (para DEMO_CAST)."""
+    print(text, flush=True)
+    for line in text.split("\n"):
+        _CAST.append({"t": round(time.perf_counter() - _T0, 3), "line": line})
 
 
 def _p(text: str = "", indent: int = 0) -> None:
     for line in (text.splitlines() or [""]):
-        print(textwrap.fill(line, WIDTH, initial_indent=" " * indent, subsequent_indent=" " * indent)
-              if line else "", flush=True)
+        _out(textwrap.fill(line, WIDTH, initial_indent=" " * indent, subsequent_indent=" " * indent)
+             if line else "")
 
 
 def run_scene(agent, n: int, title: str, question: str, note: str) -> float:
-    print("\n" + "─" * WIDTH)
+    _CAST.append({"t": round(time.perf_counter() - _T0, 3), "scene": n})
+    _out("\n" + "─" * WIDTH)
     _p(f"[{n}/{len(SCENES)}] {title}")
     _p(note, 2)
     _p(f"Q: {question}", 2)
@@ -93,12 +109,18 @@ def main(argv: list[str] | None = None) -> int:
         from legacybridge.agent import Agent
         agent = Agent(provider=args.provider, user="demo", proposals=ListProposalStore(), telemetry=None)
 
-    print("LegacyBridge — answers over a legacy ERP, with evidence, guardrails and human-in-the-loop")
-    print(f"model: {args.provider} · data: synthetic · every query runs through a read-only role")
+    _out("LegacyBridge — answers over a legacy ERP, with evidence, guardrails and human-in-the-loop")
+    _out(f"model: {args.provider} · data: synthetic · every query runs through a read-only role")
     scenes = [(args.scene, *SCENES[args.scene - 1])] if args.scene else [(i + 1, *s) for i, s in enumerate(SCENES)]
-    total = sum(run_scene(agent, *s) for s in scenes)
-    print("\n" + "─" * WIDTH)
-    print(f"{len(scenes)} scene(s) in {total:.0f}s · nothing was written to the database")
+    t_start = time.perf_counter()
+    for s in scenes:
+        run_scene(agent, *s)
+    total = time.perf_counter() - t_start
+    _out("\n" + "─" * WIDTH)
+    _out(f"{len(scenes)} scene(s) in {total:.0f}s · nothing was written to the database")
+    if os.environ.get("DEMO_CAST"):
+        with open(os.environ["DEMO_CAST"], "w", encoding="utf-8") as f:
+            json.dump({"provider": args.provider, "total": round(total, 2), "events": _CAST}, f, ensure_ascii=False)
     return 0
 
 

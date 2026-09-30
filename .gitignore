@@ -7,3 +7,5 @@ evals/results/
 .pytest_cache/
 # telemetría local (no versionada)
 var/
+# video del demo (se genera; pesa demasiado para git)
+docs/demo/*.mp4

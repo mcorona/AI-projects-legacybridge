@@ -1,4 +1,4 @@
-.PHONY: setup db db-migrate seed index demo ask proposals telemetry agent-check rescore test test-unit mcp-dev mcp-check smoke eval
+.PHONY: setup db db-migrate seed index demo demo-replay ask proposals telemetry agent-check rescore test test-unit mcp-dev mcp-check smoke eval
 
 setup:
 	python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -31,6 +31,10 @@ index:
 # Recorrido de ~90 s para el video demo (6 escenas reales con Qwen local). ARGS="--scene 3" | "-p cascade"
 demo:
 	@. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.demo $(ARGS)
+
+# Reproduce una corrida real registrada (DEMO_CAST=... make demo) con las esperas comprimidas, para el video
+demo-replay:
+	@PYTHONPATH=src .venv/bin/python -m scripts.replay_demo $(CAST) --target 85 $(if $(TIMELINE),--timeline $(TIMELINE))
 
 # Pregunta al agente: make ask Q="¿Cuántos clientes activos hay?" [P=local|omniroute|bedrock|cascade]
 ask:

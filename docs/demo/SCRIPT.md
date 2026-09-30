@@ -1,7 +1,18 @@
 # 90-second demo — storyboard
 
-Record `make demo` in a terminal (font ≥ 16 pt, 100 columns). Model waits take 10–30 s per scene:
-speed them up 3–4× in editing so the video lands at ~90 s. Every scene is a live agent call.
+**Generated video** (≈ 88 s, 1280×720, burned-in English captions):
+
+```bash
+DEMO_CAST=/tmp/cast.json make demo            # real run, every printed line recorded with its time
+python scripts/make_video.py /tmp/cast.json docs/demo/legacybridge-demo.mp4   # needs Pillow (separate venv)
+make demo-replay CAST=/tmp/cast.json          # same replay in the terminal
+```
+
+The video draws the terminal from the recorded real output; only the model waits are compressed, and the
+opening card says so. (A live terminal recording with VHS froze mid-run, so frames are rendered instead.)
+
+**Recording it yourself:** run `make demo` in a terminal (font ≥ 16 pt, 100 columns) and speed up the
+10–30 s model waits 3–4× in editing.
 
 | Time | Scene | On screen | Narration |
 |---|---|---|---|
