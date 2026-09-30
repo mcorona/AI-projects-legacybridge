@@ -1,4 +1,4 @@
-.PHONY: setup db db-migrate seed index ask proposals telemetry agent-check rescore test test-unit mcp-dev mcp-check smoke eval
+.PHONY: setup db db-migrate seed index demo ask proposals telemetry agent-check rescore test test-unit mcp-dev mcp-check smoke eval
 
 setup:
 	python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -27,6 +27,10 @@ seed: db
 # Indexa DDL, diccionario y defectos en pgvector (incremental). ARGS="--dry-run" para previsualizar.
 index:
 	. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m legacybridge.rag.index $(ARGS)
+
+# Recorrido de ~90 s para el video demo (6 escenas reales con Qwen local). ARGS="--scene 3" | "-p cascade"
+demo:
+	@. .venv/bin/activate && set -a && . ./.env && set +a && PYTHONPATH=src python -m scripts.demo $(ARGS)
 
 # Pregunta al agente: make ask Q="¿Cuántos clientes activos hay?" [P=local|omniroute|bedrock|cascade]
 ask:
