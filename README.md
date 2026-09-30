@@ -4,7 +4,7 @@
 with verifiable evidence, reproducible evaluation, layered guardrails and a cost-aware model cascade.**
 
 > Status: ✅ Phases 0–4 · ◐ Phase 5 (cascade and telemetry built; the Bedrock benchmark is pending an
-> AWS account-level block) · ✅ Phase 6 publication. See [`docs/PLAN.md`](docs/PLAN.md).
+> AWS account-level block) · ✅ Phase 6 publication (demo video and posts in progress). See [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Why
 Critical business data still lives in decades-old ERPs: cryptic table names (`cliemae`, `artmae`),

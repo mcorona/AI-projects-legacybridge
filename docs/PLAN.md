@@ -43,5 +43,8 @@ Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL 
 - **Aceptación:** cascada ≥ 95% de la accuracy de Bedrock-only con ≤ 20% de su costo (meta).
 
 ## Fase 6 — Publicación (semana 6)
-- [ ] README en inglés con diagrama, resultados y "failure modes".
+- [x] README en inglés con diagrama, resultados y "failure modes".
+      (publicado: https://github.com/mcorona/AI-projects-legacybridge; quick start verificado desde un clon limpio)
 - [ ] Video demo de 90 s; post destacado y artículo en LinkedIn; caso de estudio para Upwork.
+      (listo para publicar: `make demo`, docs/demo/SCRIPT.md y transcript.md; textos EN/ES fuera del
+      repositorio. Falta que el autor grabe el video y publique)
