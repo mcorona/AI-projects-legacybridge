@@ -36,7 +36,7 @@ de PII. No se consultan al desarrollar; los ejemplos de las pruebas unitarias so
 | `wrap_tool_output` | Delimita las salidas como datos no confiables y **escapa cierres falsos**. |
 | `check_output` | DLP: credenciales, hashes de contraseña y nombres de tablas restringidas; PII: se enmascara RFC de persona física, CURP, correo, teléfono, tarjeta y CLABE. El RFC de persona moral se permite. |
 | Auditoría | `ops.audit_log`, rol `lb_audit` con solo INSERT. |
-| Bedrock (opcional) | `ApplyGuardrail` en entrada y salida con `BEDROCK_GUARDRAIL_ID`. El cliente lo crea `llm.router` (una prueba impide importar SDKs de proveedor fuera de `llm/`). Probado con respuestas simuladas; no se crean recursos en AWS desde el repositorio. |
+| Bedrock (opcional) | `ApplyGuardrail` en entrada y salida con `BEDROCK_GUARDRAIL_ID`. El cliente lo crea `llm.router` (una prueba impide importar SDKs de proveedor fuera de `llm/`). Probado con respuestas simuladas y, el 2026-10-01, en vivo con un guardrail temporal (ver *Prueba en vivo*); no se crean recursos en AWS desde el repositorio. |
 
 La **evidencia interna** conserva las filas íntegras (verificación y auditoría); todo lo que sale
 hacia el usuario (respuesta, advertencias, evidencia pública, `--json`) y hacia clientes MCP
@@ -107,3 +107,25 @@ Regresión del split test (90 × 1) con guardrails: execution accuracy 83.8 % (F
 - La corrida de regresión sobrescribió el reporte oficial de la Fase 3 (mismo nombre); se restauró
   desde git y los reportes ahora incluyen la hora.
 - El reporte y `rescore` no resolvían preguntas del holdout; ahora usan `evals.dataset.by_id()`.
+
+## Prueba en vivo de Bedrock Guardrails (2026-10-01)
+
+Guardrail temporal (nivel STANDARD, perfil `us.guardrail.v1:0`): filtro PROMPT_ATTACK alto en entrada,
+tema denegado `credenciales` y regex `RFC_FISICA` (ANONYMIZE). Se evaluó con `ApplyGuardrail` a través
+del adaptador del repositorio y se borró al terminar. Reporte: `evals/reports/2026-10-01-bedrock-guardrails-live.md`.
+
+| Conjunto | n | Bedrock bloquea | Capa local determinista |
+|---|---:|---:|---:|
+| Ataques que deben rechazarse | 17 | 53 % | 65 % |
+| Otros ataques (DML → propuesta, inyección indirecta, PII) | 13 | 8 % | 0 % |
+| Preguntas legítimas (falsos positivos) | 105 | 0 % | 0 % |
+
+- Entre los que deben rechazarse, Bedrock no detectó ninguno que la capa local dejara pasar: no aporta cobertura adicional en
+  este conjunto. Los ataques que ninguna capa bloquea en la entrada (SQL disfrazada, catálogos,
+  `version()`, `set_config`) los contienen el guard SQL y el rol `lb_ro` (100 % de manejo seguro en
+  los reportes adversariales).
+- Bloqueó a009 completo, que mezcla un conteo legítimo con un DELETE en CTE: el agente responde el
+  conteo y rechaza el DELETE, que es el comportamiento esperado.
+- En salida, la regex enmascaró el RFC de persona física y respetó el de persona moral.
+- **Decisión:** Bedrock Guardrails sigue siendo una capa opcional (defensa en profundidad o
+  requisito de cumplimiento), no un sustituto del guard SQL ni de los permisos de base de datos.

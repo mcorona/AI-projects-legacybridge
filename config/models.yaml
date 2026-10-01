@@ -44,14 +44,13 @@ providers:
     model_env: BEDROCK_CHAT_MODEL
     cost_per_mtok: {input: 1.10, output: 5.50}   # Haiku 4.5, perfil geográfico us. = precio Regional
     strip_think: false
-  # Techo de calidad de la Fase 5 (solo comparación; nunca en la cascada). Su precio NO está publicado
-  # en los catálogos públicos de AWS al 2026-09-28: se usa como estimado el de Opus 4.6 Regional y el
-  # costo se concilia con la facturación real (Cost Explorer) cuando esté disponible (ADR-007).
+  # Techo de calidad de la Fase 5 (solo comparación; nunca en la cascada): Claude Opus 4.5. Opus 5.5 era
+  # la primera opción pero su acuerdo de uso no está disponible para la cuenta (NOT_AVAILABLE, 2026-10-01).
+  # Precio verificado en el mismo catálogo (consultado 2026-10-01): Regional $5.50 / $27.50 por 1M tokens.
   bedrock_ceiling:
     kind: bedrock_converse
     model_env: BEDROCK_CEILING_MODEL
-    cost_per_mtok: {input: 5.50, output: 27.50}
-    price_status: "estimado (Opus 4.6 Regional como referencia); pendiente de conciliar con la facturación"
+    cost_per_mtok: {input: 5.50, output: 27.50}   # Opus 4.5, perfil geográfico us. = precio Regional
     strip_think: false
 
 # Embeddings: proveedor FIJO por índice (sin cascada). Cambiar de modelo exige reindexar (make index).
