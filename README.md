@@ -3,8 +3,8 @@
 **An AI agent that safely answers business questions over legacy enterprise databases through MCP —
 with verifiable evidence, reproducible evaluation, layered guardrails and a cost-aware model cascade.**
 
-> Status: ✅ Phases 0–4 · ◐ Phase 5 (cascade and telemetry built; the Bedrock benchmark is pending an
-> AWS account-level block) · ✅ Phase 6 publication (demo video and posts in progress). See [`docs/PLAN.md`](docs/PLAN.md).
+> Status: ✅ Phases 0–6 — the cost cascade meets its target: Bedrock-level accuracy at 6% of the
+> Bedrock cost. See [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Why
 Critical business data still lives in decades-old ERPs: cryptic table names (`cliemae`, `artmae`),
@@ -16,23 +16,32 @@ documented legacy defects ([`docs/LEGACY_DEFECTS.md`](docs/LEGACY_DEFECTS.md)) �
 answer with the SQL it actually ran and the rows it got back.
 
 ## Results
-Held-out **test split** (90 questions), synthetic ERP data with every defect seeded, local
-**Qwen3.6-35B-A3B** on LM Studio. Every figure links to a versioned report with a reproducibility
-fingerprint (commit, golden-set, prompt, tool-spec, data and index hashes, model ids, prices).
+Held-out **test split** (90 questions), synthetic ERP data with every defect seeded, same tools and
+prompt for every model. Every figure links to a versioned report with a reproducibility fingerprint
+(commit, golden-set, prompt, tool-spec, data and index hashes, model ids, prices).
 
-| Metric | Local Qwen (×3 runs) | OmniRoute free tier (×1) |
-|---|---|---|
-| **Execution accuracy** (result sets, not SQL text) | **95.4%** [95.0–96.2] | 88.8% |
-| **SWAR** — silent wrong answers (wrong *and* confidence ≥ 0.6) | **3.8%** [2.5–5.0] | 11.2% |
-| Runs completed | 97.0% | 100% |
-| False refusals on legitimate questions | 0% | 0% |
-| Latency p50 / p95 | 19 s / 43 s | 17 s / 28 s |
-| Real cost | **$0** | $0 |
+| Metric | Local Qwen3.6 (×3) | Bedrock Haiku 4.5 (×3) | **Cascade local → Haiku (×3)** | Opus 4.5 ceiling (×1) | OmniRoute free (×1) |
+|---|---|---|---|---|---|
+| **Execution accuracy** (result sets, not SQL text) | 95.4% | 93.3% | **95.4%** | 93.8% | 88.8% |
+| **SWAR** — silent wrong answers (wrong *and* confidence ≥ 0.6) | 3.8% | 6.7% | **4.6%** | 6.2% | 11.2% |
+| Runs completed | 97.0% | 100% | **100%** | 100% | 100% |
+| Questions escalated | — | — | 6.3% | — | — |
+| False refusals on legitimate questions | 0% | 0% | 0% | 0% | 0% |
+| Latency p50 / p95 | 19 s / 43 s | 9 s / 16 s | 17 s / 43 s | 15 s / 26 s | 17 s / 28 s |
+| Cost per query (real, AWS list price) | $0 | $0.0281 | **$0.0018** | $0.1315 | $0 |
 
-By level (local): easy 100% · joins & business rules 96.7% · legacy-defect traps 86.7%.
-Reports: [local](evals/reports/2026-09-28-2307-test-local.md) ·
+**Phase 5 target met:** the cascade reaches **102%** of Bedrock-only accuracy at **6.4%** of its cost
+(target: ≥ 95% at ≤ 20%). It completes every run by escalating the 6% of questions where the local model
+gets stuck. A bigger model did not help: Haiku and Opus score below local Qwen with the same tools — on
+this problem, business context (rules, name hints, evidence) matters more than model size.
+
+Ranges across repetitions, per-level breakdowns and the comparability check are in the reports:
+[local](evals/reports/2026-09-28-2307-test-local.md) ·
+[Bedrock](evals/reports/2026-10-01-2258-test-bedrock.md) ·
+[cascade](evals/reports/2026-10-01-2343-test-cascade.md) ·
+[Opus 4.5](evals/reports/2026-10-02-0119-test-bedrock_ceiling.md) ·
 [OmniRoute](evals/reports/2026-09-29-0051-test-omniroute.md) ·
-[comparison](evals/reports/2026-09-29-phase5-comparison.md).
+[comparison](evals/reports/2026-10-01-phase5-comparison.md).
 
 **Security** — adversarial prompts, 3 runs each ([golden set](evals/reports/2026-09-28-adversarial-local-rescored.md),
 [held-out](evals/reports/2026-09-28-holdout-local-rescored.md)):
@@ -99,7 +108,7 @@ flowchart LR
 ## Failure modes
 What still goes wrong, measured on the test split — not hidden:
 
-- **Silent wrong answers (3.8%).** The agent is sometimes confidently wrong on defect traps: summing
+- **Silent wrong answers (3.8% local, 4.6% cascade).** The agent is sometimes confidently wrong on defect traps: summing
   amounts across currencies instead of grouping them (D7), converting boxes to pieces but not excluding
   kilograms (D6), counting orphan lines with an inner join (D2). The model reports confidence ≈ 1.0, so
   **confidence-based escalation cannot catch these**; only objective signals (unfinished runs, SQL
@@ -115,9 +124,13 @@ What still goes wrong, measured on the test split — not hidden:
 - **Evaluation limits.** Result-set comparison accepts extra columns (tolerant mode; strict is reported
   too) and treats business labels from the dictionary as equivalent to codes. Local model output varies
   between runs even at temperature 0, which is why every official figure is a mean of repetitions.
-- **Pending benchmark.** The Bedrock-only and cascade runs — and the Phase 5 target (cascade ≥ 95% of
-  Bedrock accuracy at ≤ 20% of its cost) — are blocked by an AWS account-level restriction on Bedrock
-  model access. The code and harness are ready; see [ADR-007](docs/adr/007-cost-cascade-and-observability.md).
+- **Two questions every model misses.** d019 and d018 fail on all four providers; the reference answers
+  apply a business rule (valid orders) or an exclusion (orphan stock) the question leaves implicit. They
+  are flagged for golden-set review rather than silently changed, which would break run comparability.
+- **Managed guardrails add little here.** A live Amazon Bedrock Guardrails probe (prompt-attack filter,
+  denied topic, RFC regex) blocked 53% of the must-refuse attacks vs 65% for the local deterministic
+  layer, caught none the local layer missed, and had 0 false positives
+  ([report](evals/reports/2026-10-01-bedrock-guardrails-live.md)). It stays optional.
 
 ## Quick start
 Requirements: Python 3.12+, Docker, [LM Studio](https://lmstudio.ai) serving `qwen/qwen3.6-35b-a3b`

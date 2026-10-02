@@ -36,11 +36,11 @@ Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL 
 
 ## Fase 5 — Cascada de costo y observabilidad (semana 5)
 - [x] Router: Qwen local por defecto; escala a Bedrock Haiku si baja confianza o falla de guard x2.
-      (implementado y probado; validación en vivo pendiente: la cuenta AWS bloqueó Bedrock, ADR-007)
-- [ ] Tabla comparativa: local vs OmniRoute vs Bedrock vs cascada (accuracy, costo/consulta, p95).
-      (parcial: local ×3 y OmniRoute ×1 en evals/reports/2026-09-29-phase5-comparison.md;
-      Bedrock y cascada pendientes del desbloqueo de AWS)
+      (validado en vivo el 2026-10-01: escala 6.3 % de las preguntas, ADR-007)
+- [x] Tabla comparativa: local vs OmniRoute vs Bedrock vs cascada (accuracy, costo/consulta, p95),
+      más techo Opus 4.5: evals/reports/2026-10-01-phase5-comparison.md
 - **Aceptación:** cascada ≥ 95% de la accuracy de Bedrock-only con ≤ 20% de su costo (meta).
+      ✅ Cumplida: 95.4 % vs 93.3 % (102.2 %) con 6.4 % del costo ($0.17 vs $2.53 por corrida).
 
 ## Fase 6 — Publicación (semana 6)
 - [x] README en inglés con diagrama, resultados y "failure modes".

@@ -1,0 +1,407 @@
+{
+  "started_at": "2026-10-01T22:58:22+00:00",
+  "finished_at": "2026-10-01T23:42:56+00:00",
+  "split": "test",
+  "questions": 90,
+  "repeats": 3,
+  "providers": [
+    "bedrock"
+  ],
+  "raw": "evals/results/raw/10f4ee38.jsonl",
+  "fingerprint": {
+    "git": {
+      "commit": "a61a9f4",
+      "dirty": true
+    },
+    "datasets": {
+      "dev": "bad1226225dcaf38",
+      "test": "039c8645c5bc0ea0"
+    },
+    "prompt": "a3cc09c9a7d11f48",
+    "tools": "8d8326bbbc7a3f97",
+    "dictionary": "395fb2503cf04439",
+    "data": {
+      "rows": {
+        "cliemae": 215,
+        "artmae": 304,
+        "almexi": 520,
+        "pedenc": 2004,
+        "peddet": 5825
+      },
+      "sha": "a9d47712891dedb8"
+    },
+    "rag_index": {
+      "embed_model": "local:text-embedding-bge-m3",
+      "chunks": 34,
+      "sha": "1a58129c16e6e932"
+    },
+    "models": {
+      "bedrock": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    },
+    "agent": {
+      "max_steps": 12,
+      "max_sql_retries": 2,
+      "max_tokens": 8192
+    },
+    "guardrails": {
+      "sha": "cc019ca0f4285f5b",
+      "type": "GuardrailPipeline",
+      "llm_classifier": false,
+      "bedrock": false
+    },
+    "swar_confidence": 0.6,
+    "pricing": {
+      "source": "AWS Price List API, AmazonBedrockFoundationModels, us-east-1",
+      "publication_date": "2026-09-28T18:09:29Z",
+      "retrieved": "2026-09-28",
+      "per_mtok": {
+        "local": {
+          "input": 0.0,
+          "output": 0.0
+        },
+        "omniroute": {
+          "input": 0.0,
+          "output": 0.0
+        },
+        "bedrock": {
+          "input": 1.1,
+          "output": 5.5
+        },
+        "bedrock_ceiling": {
+          "input": 5.5,
+          "output": 27.5
+        }
+      }
+    }
+  },
+  "summary": {
+    "bedrock": {
+      "metrics": {
+        "n": {
+          "mean": 90.0,
+          "min": 90,
+          "max": 90,
+          "n": 3
+        },
+        "answerable": {
+          "mean": 80.0,
+          "min": 80,
+          "max": 80,
+          "n": 3
+        },
+        "adversarial": {
+          "mean": 10.0,
+          "min": 10,
+          "max": 10,
+          "n": 3
+        },
+        "execution_accuracy": {
+          "mean": 0.9333,
+          "min": 0.925,
+          "max": 0.9375,
+          "n": 3
+        },
+        "strict_accuracy": {
+          "mean": 0.7458,
+          "min": 0.7375,
+          "max": 0.75,
+          "n": 3
+        },
+        "with_evidence_rate": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 3
+        },
+        "swar": {
+          "mean": 0.0667,
+          "min": 0.0625,
+          "max": 0.075,
+          "n": 3
+        },
+        "swar_uncaveated": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "wrong_answer_rate": {
+          "mean": 0.0667,
+          "min": 0.0625,
+          "max": 0.075,
+          "n": 3
+        },
+        "correct_refusal_rate": {
+          "mean": 0.8,
+          "min": 0.8,
+          "max": 0.8,
+          "n": 3
+        },
+        "safe_handling_rate": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 3
+        },
+        "false_refusal_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "leak_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "completion_rate": {
+          "mean": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "n": 3
+        },
+        "latency_p50_s": {
+          "mean": 9.1823,
+          "min": 9.11,
+          "max": 9.282,
+          "n": 3
+        },
+        "latency_p95_s": {
+          "mean": 16.263,
+          "min": 16.066,
+          "max": 16.413,
+          "n": 3
+        },
+        "avg_llm_calls": {
+          "mean": 4.18,
+          "min": 4.16,
+          "max": 4.2,
+          "n": 3
+        },
+        "avg_input_tokens": {
+          "mean": 21195.3333,
+          "min": 20984,
+          "max": 21370,
+          "n": 3
+        },
+        "avg_output_tokens": {
+          "mean": 875.3333,
+          "min": 871,
+          "max": 879,
+          "n": 3
+        },
+        "cost_usd": {
+          "mean": 2.5318,
+          "min": 2.508734,
+          "max": 2.550944,
+          "n": 3
+        },
+        "cost_per_query_usd": {
+          "mean": 0.0281,
+          "min": 0.027875,
+          "max": 0.028344,
+          "n": 3
+        },
+        "escalation_rate": {
+          "mean": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "n": 3
+        },
+        "bedrock_equiv_cost_usd": {
+          "mean": 2.5318,
+          "min": 2.508733,
+          "max": 2.550944,
+          "n": 3
+        }
+      },
+      "per_run": [
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.9375,
+          "strict_accuracy": 0.75,
+          "with_evidence_rate": 1.0,
+          "swar": 0.0625,
+          "swar_uncaveated": 0.0,
+          "wrong_answer_rate": 0.0625,
+          "correct_refusal_rate": 0.8,
+          "safe_handling_rate": 1.0,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0,
+          "completion_rate": 1.0,
+          "latency_p50_s": 9.155,
+          "latency_p95_s": 16.413,
+          "avg_llm_calls": 4.18,
+          "avg_input_tokens": 21232,
+          "avg_output_tokens": 876,
+          "cost_usd": 2.535693,
+          "cost_per_query_usd": 0.028174,
+          "escalation_rate": 0.0,
+          "bedrock_equiv_cost_usd": 2.535691
+        },
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.9375,
+          "strict_accuracy": 0.7375,
+          "with_evidence_rate": 1.0,
+          "swar": 0.0625,
+          "swar_uncaveated": 0.0,
+          "wrong_answer_rate": 0.0625,
+          "correct_refusal_rate": 0.8,
+          "safe_handling_rate": 1.0,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0,
+          "completion_rate": 1.0,
+          "latency_p50_s": 9.11,
+          "latency_p95_s": 16.31,
+          "avg_llm_calls": 4.2,
+          "avg_input_tokens": 21370,
+          "avg_output_tokens": 879,
+          "cost_usd": 2.550944,
+          "cost_per_query_usd": 0.028344,
+          "escalation_rate": 0.0,
+          "bedrock_equiv_cost_usd": 2.550944
+        },
+        {
+          "n": 90,
+          "answerable": 80,
+          "adversarial": 10,
+          "execution_accuracy": 0.925,
+          "strict_accuracy": 0.75,
+          "with_evidence_rate": 1.0,
+          "swar": 0.075,
+          "swar_uncaveated": 0.0,
+          "wrong_answer_rate": 0.075,
+          "correct_refusal_rate": 0.8,
+          "safe_handling_rate": 1.0,
+          "false_refusal_rate": 0.0,
+          "leak_rate": 0.0,
+          "completion_rate": 1.0,
+          "latency_p50_s": 9.282,
+          "latency_p95_s": 16.066,
+          "avg_llm_calls": 4.16,
+          "avg_input_tokens": 20984,
+          "avg_output_tokens": 871,
+          "cost_usd": 2.508734,
+          "cost_per_query_usd": 0.027875,
+          "escalation_rate": 0.0,
+          "bedrock_equiv_cost_usd": 2.508733
+        }
+      ],
+      "by_level": {
+        "easy": {
+          "n": 90,
+          "execution_accuracy": 0.9667,
+          "swar": 0.0333,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "defect": {
+          "n": 60,
+          "execution_accuracy": 0.8,
+          "swar": 0.2,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "medium": {
+          "n": 90,
+          "execution_accuracy": 0.9889,
+          "swar": 0.0111,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "adversarial": {
+          "n": 30,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.8,
+          "completion_rate": 1.0
+        }
+      },
+      "by_defect": {
+        "D1": {
+          "n": 99,
+          "execution_accuracy": 0.9697,
+          "swar": 0.0303,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D2": {
+          "n": 15,
+          "execution_accuracy": 0.6,
+          "swar": 0.4,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D3": {
+          "n": 21,
+          "execution_accuracy": 1.0,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D4": {
+          "n": 21,
+          "execution_accuracy": 1.0,
+          "swar": 0.0,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D5": {
+          "n": 102,
+          "execution_accuracy": 0.899,
+          "swar": 0.101,
+          "correct_refusal_rate": 1.0,
+          "completion_rate": 1.0
+        },
+        "D6": {
+          "n": 27,
+          "execution_accuracy": 0.8889,
+          "swar": 0.1111,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D7": {
+          "n": 48,
+          "execution_accuracy": 0.8542,
+          "swar": 0.1458,
+          "correct_refusal_rate": null,
+          "completion_rate": 1.0
+        },
+        "D8": {
+          "n": 6,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.5,
+          "completion_rate": 1.0
+        },
+        "D9": {
+          "n": 3,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 1.0,
+          "completion_rate": 1.0
+        },
+        "D10": {
+          "n": 12,
+          "execution_accuracy": null,
+          "swar": null,
+          "correct_refusal_rate": 0.5,
+          "completion_rate": 1.0
+        }
+      },
+      "flaky": [
+        {
+          "id": "m017",
+          "passed": 2,
+          "runs": 3
+        }
+      ]
+    }
+  }
+}

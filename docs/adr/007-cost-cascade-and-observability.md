@@ -50,8 +50,8 @@ Bedrock-only con ≤ 20 % de su costo. Hallazgos al iniciar:
 - Precios con fuente y fecha en `config/models.yaml`; forman parte de la huella de cada reporte.
 - `evals/compare_runs.py` combina corridas hechas en momentos distintos y solo las declara
   comparables si coinciden golden set, datos, prompt, herramientas, diccionario y guardrails.
-- Techo de calidad opcional (Opus 5.5): su precio no está publicado en los catálogos públicos de AWS
-  al 2026-09-28; se usa un estimado marcado y se concilia con la facturación real.
+- Techo de calidad opcional: Opus 4.5 (Opus 5.5 no tiene acuerdo disponible para la cuenta), con
+  precio verificado en el catálogo de AWS el 2026-10-01.
 
 ## Alternativas consideradas
 - **Solo la cascada por llamada**: no detecta corridas sin terminar ni respuestas sin evidencia.
@@ -90,14 +90,36 @@ Implicación para la cascada: con 97 % de corridas terminadas, el nivel local de
 cascada costaría muy por debajo del 20 % de Bedrock-only; el reto de la meta es la accuracy, porque la
 cascada no corrige el 3.8 % de respuestas incorrectas silenciosas.
 
-### Pendiente (bloqueado por AWS)
-Desde el 2026-09-28 (~23:00 UTC) la cuenta devuelve `Error 002: Access to Bedrock models is not allowed
-for this account` para todos los modelos, incluido Haiku 4.5 con acceso de modelo AUTHORIZED; es una
-restricción de cuenta que resuelve AWS Support. La corrida de dev iniciada en ese momento es inválida
-para Bedrock. Pendientes, con el mismo código y huella:
-- Bedrock-only ×3 y cascada ×3 sobre test → `python -m evals.compare_runs` → verificación de la meta.
-- Techo de calidad Opus 5.5 ×1 (además requiere aceptar su acuerdo de uso) con costo conciliado con la
-  facturación.
-- Prueba en vivo de Bedrock Guardrails (ADR-006).
-Evidencia previa de Bedrock (dev, antes del bloqueo): el agente completo sobre Haiku 4.5 funcionó a
-~$0.025-0.029 por consulta; dev: cascada 92 % vs Bedrock 88 % con 0 escalamientos.
+### Bedrock y verificación de la meta (2026-10-01, split test)
+
+AWS levantó la restricción de cuenta (`Error 002`, 2026-09-28 a 2026-10-01). Comparativa final con las cinco
+corridas: `evals/reports/2026-10-01-phase5-comparison.md` (misma huella de golden set, datos, prompt,
+herramientas, diccionario y guardrails).
+
+| Métrica | Qwen local (×3) | OmniRoute (×1) | Bedrock Haiku 4.5 (×3) | **Cascada (×3)** | Techo Opus 4.5 (×1) |
+|---|---|---|---|---|---|
+| Execution accuracy | 95.4 % | 88.8 % | 93.3 % | **95.4 %** | 93.8 % |
+| SWAR | 3.8 % | 11.2 % | 6.7 % | **4.6 %** | 6.2 % |
+| Corridas terminadas | 97.0 % | 100 % | 100 % | **100 %** | 100 % |
+| Rechazo correcto (adversariales) | 76.7 % | 70.0 % | 80.0 % | 80.0 % | 90.0 % |
+| Escaladas | — | — | — | 6.3 % | — |
+| Costo real por corrida (90 preguntas) | $0 | $0 | $2.53 | **$0.17** | $11.83 |
+| Costo por consulta | $0 | $0 | $0.0281 | **$0.0018** | $0.1315 |
+| Latencia p50 / p95 | 19 s / 43 s | 17 s / 28 s | 9 s / 16 s | 17 s / 43 s | 15 s / 26 s |
+
+**Meta del PLAN cumplida:** la cascada logra **102.2 %** de la accuracy de Bedrock-only (meta ≥ 95 %)
+con **6.4 %** de su costo (meta ≤ 20 %).
+
+- La cascada termina el 100 % de las corridas: rescata el 3 % que Qwen dejaba sin terminar y escala
+  solo 6.3 % de las preguntas. Por nivel: easy 100 %, medium 94.4 %, defect 90.0 %.
+- Más modelo no es mejor respuesta en este dominio: Haiku y Opus quedan por debajo de Qwen con las
+  mismas herramientas. Lo que más mueve la accuracy es el contexto (reglas de negocio, sugerencias de
+  nombres, evidencia), no el tamaño del modelo. Bedrock-only es, en cambio, el más rápido (p50 9 s).
+- Dos preguntas fallan en los cuatro proveedores: d019 (la referencia aplica la regla de pedido válido
+  que la pregunta no menciona) y d018 (la referencia excluye existencias de artículos huérfanos).
+  Quedan para revisión del golden set; no se cambiaron para no invalidar la comparación.
+- El techo usa **Opus 4.5**, no Opus 5.5: el acuerdo de uso de Opus 5.5 aparece como NOT_AVAILABLE para
+  la cuenta. Precio de Opus 4.5 verificado en el catálogo de AWS (Regional $5.50 / $27.50).
+- Bedrock Guardrails en vivo: ADR-006, *Prueba en vivo*.
+- Gasto total en Bedrock de la Fase 5: ≈ $20 en la evaluación final (Bedrock ×3 $7.6, cascada ×3 $0.5, Opus ×1 $11.8) (más ≈ $1.6 previos), cubierto
+  por créditos; alarma de presupuesto `legacybridge-evals-40usd`.
