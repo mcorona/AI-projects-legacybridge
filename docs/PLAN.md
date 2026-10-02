@@ -45,7 +45,7 @@ Prerrequisito: `inventory-copilot` terminado (reutilizamos su capa LLM y el SQL 
 ## Fase 6 — Publicación (semana 6)
 - [x] README en inglés con diagrama, resultados y "failure modes".
       (publicado: https://github.com/mcorona/AI-projects-legacybridge; quick start verificado desde un clon limpio)
-- [ ] Video demo de 90 s; post destacado y artículo en LinkedIn; caso de estudio para Upwork.
-      (video de 88 s generado desde una corrida real, `scripts/make_video.py`; post de LinkedIn en inglés
-      publicado el 2026-09-29; pendientes: artículo de LinkedIn y proyecto en el portafolio de Upwork,
-      con textos EN/ES listos fuera del repositorio)
+- [x] Video demo de 90 s; post destacado y artículo en LinkedIn; caso de estudio para Upwork.
+      (video de 88 s generado desde una corrida real, `scripts/make_video.py`; post de LinkedIn publicado
+      el 2026-09-29; artículo de LinkedIn y proyecto en el portafolio de Upwork publicados el 2026-10-01,
+      ya con los resultados de la Fase 5)
