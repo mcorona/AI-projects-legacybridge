@@ -6,6 +6,13 @@ with verifiable evidence, reproducible evaluation, layered guardrails and a cost
 > Status: ✅ Phases 0–6 — the cost cascade meets its target: Bedrock-level accuracy at 6% of the
 > Bedrock cost. See [`docs/PLAN.md`](docs/PLAN.md).
 
+> **Companion project: [Inventory Copilot](https://github.com/mcorona/AI-projects-inventory-copilot).**
+> LegacyBridge answers *can I trust what the agent **says** about my data?*: read-only questions over a
+> hostile legacy schema, through MCP, with verifiable evidence, a silent-wrong-answer rate (SWAR) and a
+> model cascade at 6% of the Bedrock cost. Inventory Copilot answers *can I trust what the agent **does**?*:
+> purchase-order actions governed by the database, a 7-model Bedrock comparison and a real AWS deployment
+> (CDK + cdk-nag, Lambda, Aurora).
+
 ## Why
 Critical business data still lives in decades-old ERPs: cryptic table names (`cliemae`, `artmae`),
 no foreign keys, dates stored as `VARCHAR(8)`, `CHAR(1)` flags where `NULL` means "no", magic status
