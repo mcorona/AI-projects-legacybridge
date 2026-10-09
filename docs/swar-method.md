@@ -1,8 +1,7 @@
 # SWAR: predicting when an agent is about to be wrong, silently
 
 > **Draft.** The method and the measurement sections are written from the code and the reports. The
-> section marked **👤** is yours: it connects this to your thesis, and I do not know its details well
-> enough to write it without inventing them.
+> thesis section is a short statement of the idea; the author may expand it.
 
 ## The problem
 
@@ -14,8 +13,8 @@ An agent over a legacy database fails in two very different ways.
   a logically deleted row counted, an invoice captured twice and counted twice. The query runs, the
   number looks plausible, and nothing in the output says otherwise.
 
-A model's own confidence does not separate them (in an earlier version of this project the reported
-confidence was almost always 1.0). The question is whether the *run itself* leaves evidence that the
+A model's own confidence does not separate them (in the evaluation, 13% to 30% of the delivered
+answers were wrong *and* confident). The question is whether the *run itself* leaves evidence that the
 answer is risky.
 
 ## The method
@@ -102,14 +101,14 @@ Limits, stated plainly:
 - **Priors, not fits.** Weights and thresholds were written down before measuring.
 - **Models change.** A free-tier result describes that model on that day (ADR-010).
 
-## 👤 Connection to your thesis
+## Connection to the author's thesis
 
-*(Yours to write.)* The thesis, *Software Behavior Prediction Using Ontologies* (2015), is about
-predicting behaviour from execution traces. The idea here is the same move, from traces of software
-to traces of agents. What belongs in this section, and only you can say it accurately:
+The author's doctoral thesis, *Software Behavior Prediction Using Ontologies* (2015), is about
+predicting the behavior of software from its execution traces, with an ontology giving the traces
+their meaning. SWAR applies the same idea to a different kind of software, an agent: the trace of a
+run is read against an ontology of the domain (here, the defect rules and term definitions of
+`docs/ontology.md`) to predict, before anyone checks the answer, whether the run is likely to end in a
+silent error.
 
-- which parts of the thesis's approach map to the signal families above, and which do not;
-- how the ontology plays the same role in both (here: defect rules and term definitions);
-- what the thesis found about prediction from partial traces, which is what the early warning's
-  first-*k*-events replay tries to test;
-- where this work deliberately differs from it.
+This states the idea, not an equivalence. This project does not reuse the thesis's method or results,
+and how far the two approaches coincide is left for the author to write.
