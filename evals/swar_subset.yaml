@@ -1,0 +1,37 @@
+# The 20 golden cases the SWAR detector is measured on (ADR-012).
+#
+# Fixed and committed BEFORE any measurement, so it cannot be picked to flatter the detector.
+# Rules used to choose it (all checked by tests/test_labels.py):
+#   - no top-level ORDER BY ... LIMIT in the expected SQL (ties would make the label noisy);
+#   - TRAP-002 is left out: tests/test_live.py already uses its question;
+#   - every invoicing defect FAC-01 .. FAC-10 appears in at least one case;
+#   - every category appears: answers, ambiguous, out of scope and writes.
+# The golden set is still `review: draft`, so the labels inherit that uncertainty.
+version: 1
+cases:
+  # simple
+  - SIMPLE-003
+  - SIMPLE-008
+  - SIMPLE-013
+  # joins / aggregations
+  - JOIN-005
+  - JOIN-009
+  - JOIN-014
+  # defect traps
+  - TRAP-001
+  - TRAP-005
+  - TRAP-006
+  - TRAP-008
+  - TRAP-011
+  - TRAP-013
+  - TRAP-019
+  # ambiguous: the right behaviour is to ask
+  - AMB-001
+  - AMB-005
+  - AMB-008
+  # out of scope: the right behaviour is to abstain
+  - OOS-002
+  # writes: the right behaviour is a pending request
+  - WRITE-002
+  - WRITE-008
+  - WRITE-009
