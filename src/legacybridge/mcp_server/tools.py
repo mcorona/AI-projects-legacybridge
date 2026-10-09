@@ -6,13 +6,9 @@ Every method returns a JSON-able dict that says what happened (``ok``, ``stage``
 
 from __future__ import annotations
 
-import base64
-import datetime as dt
 import difflib
 import time
-import uuid
 from collections.abc import Callable
-from decimal import Decimal
 from typing import Any
 
 import psycopg
@@ -22,29 +18,13 @@ from sqlglot.errors import SqlglotError
 
 from legacybridge import policy
 from legacybridge.db import connect as default_connect
+from legacybridge.jsonable import to_json_value
 from legacybridge.mcp_server.schema import Schema, schema_from_db
 from legacybridge.mcp_server.sql_guard import GuardResult, validate
 from legacybridge.semantic.defect_rules import Checker, Violation
 from legacybridge.semantic.loader import Ontology, load_ontology
 
 Connect = Callable[..., psycopg.Connection]
-
-
-def to_json_value(v: Any) -> Any:
-    """Convert psycopg types to JSON without losing what matters."""
-    if isinstance(v, Decimal):
-        return int(v) if v == v.to_integral_value() and v.is_finite() else float(v)
-    if isinstance(v, dt.date | dt.datetime | dt.time):
-        return v.isoformat()
-    if isinstance(v, dt.timedelta | uuid.UUID):
-        return str(v)
-    if isinstance(v, bytes | bytearray | memoryview):
-        return {"base64": base64.b64encode(bytes(v)).decode()}
-    if isinstance(v, list | tuple):
-        return [to_json_value(x) for x in v]
-    if isinstance(v, dict):
-        return {k: to_json_value(x) for k, x in v.items()}
-    return v
 
 
 def _first_line(e: Exception) -> str:
@@ -473,43 +453,7 @@ class LegacyTools:
 
     @staticmethod
     def _check_change(table: Any, update: Any, where: Any, reason: Any) -> dict | None:
-        if (
-            not isinstance(table, str)
-            or not isinstance(update, dict)
-            or not isinstance(where, dict)
-        ):
-            return _failure("policy", "invalid_change", "table, update and where are required")
-        if not update:
-            return _failure("policy", "empty_update", "update must name at least one column")
-        if not where:
-            return _failure(
-                "policy",
-                "empty_where",
-                "where must identify rows",
-                "Whole-table changes are refused.",
-            )
-        if reason is not None and (not isinstance(reason, str) or len(reason) > 200):
-            return _failure("policy", "invalid_reason", "reason must be text of at most 200 chars")
-        if table not in policy.WRITABLE:
-            return _failure(
-                "policy",
-                "table_not_writable",
-                table[:60],
-                f"Writable tables: {', '.join(sorted(policy.WRITABLE))}. Removing a record means "
-                "setting its status/activo, never DELETE.",
-            )
-        forbidden = sorted(set(update) - policy.WRITABLE[table])
-        if forbidden:
-            return _failure(
-                "policy",
-                "column_not_writable",
-                ", ".join(forbidden)[:80],
-                f"Writable columns of {table}: {', '.join(sorted(policy.WRITABLE[table]))}.",
-            )
-        if any(not isinstance(k, str) or not isinstance(v, str) or len(v) > 100
-               for k, v in where.items()):  # fmt: skip
-            return _failure("policy", "invalid_where", "where must map column names to short text")
-        bad_values = policy.validate_write_values(table, update)
-        if bad_values:
-            return _failure("policy", "invalid_value", "; ".join(bad_values)[:200])
-        return None
+        problem = policy.validate_change(table, update, where, reason)
+        if problem is None:
+            return None
+        return _failure("policy", problem.code, problem.detail, problem.hint)

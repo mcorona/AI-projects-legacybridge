@@ -8,6 +8,7 @@ catalog. What may be *written* is listed here and must match the real privileges
 from __future__ import annotations
 
 import re
+from typing import Any, NamedTuple
 
 MAX_ROWS = 500  # hard cap on rows returned by run_query
 DEFAULT_ROWS = 100
@@ -83,3 +84,48 @@ def validate_write_values(table: str, update: dict[str, str]) -> list[str]:
         if pattern is not None and not pattern.match(value):
             problems.append(f"{table}.{column}: value has an invalid format")
     return problems
+
+
+class ChangeProblem(NamedTuple):
+    code: str
+    detail: str
+    hint: str = ""
+
+
+def validate_change(
+    table: Any, update: Any, where: Any, reason: Any = None
+) -> ChangeProblem | None:
+    """Why a write request is not acceptable, or None. Used when it is proposed and again when it
+    is approved, because the stored request is not trusted."""
+    if not isinstance(table, str) or not isinstance(update, dict) or not isinstance(where, dict):
+        return ChangeProblem("invalid_change", "table, update and where are required")
+    if not update:
+        return ChangeProblem("empty_update", "update must name at least one column")
+    if not where:
+        return ChangeProblem(
+            "empty_where", "where must identify rows", "Whole-table changes are refused."
+        )
+    if reason is not None and (not isinstance(reason, str) or len(reason) > 200):
+        return ChangeProblem("invalid_reason", "reason must be text of at most 200 chars")
+    if table not in WRITABLE:
+        return ChangeProblem(
+            "table_not_writable",
+            table[:60],
+            f"Writable tables: {', '.join(sorted(WRITABLE))}. Removing a record means setting its "
+            "status/activo, never DELETE.",
+        )
+    forbidden = sorted(set(update) - WRITABLE[table])
+    if forbidden:
+        return ChangeProblem(
+            "column_not_writable",
+            ", ".join(forbidden)[:80],
+            f"Writable columns of {table}: {', '.join(sorted(WRITABLE[table]))}.",
+        )
+    if any(
+        not isinstance(k, str) or not isinstance(v, str) or len(v) > 100 for k, v in where.items()
+    ):
+        return ChangeProblem("invalid_where", "where must map column names to short text")
+    bad_values = validate_write_values(table, update)
+    if bad_values:
+        return ChangeProblem("invalid_value", "; ".join(bad_values)[:200])
+    return None
