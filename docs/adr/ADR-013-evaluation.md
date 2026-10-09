@@ -105,3 +105,21 @@ guard, the tools, the labels, the metrics and the detector.
 2. **Repeated runs per arm.** Would measure run-to-run noise; multiplies hours of runtime.
 3. **Tuning the confidence threshold on the golden set.** Flatters the SWAR rate; the threshold stays
    a prior.
+
+## Changes after the specification (2026-10-09, before the live runs)
+
+Found while building the gate, and fixed before any live measurement. None changes a metric, a
+threshold or a label.
+
+1. **The first CI run exposed a defect that a local run could not.** The reference SQL of TRAP-007
+   exceeded `lb_reader`'s 5 s statement timeout on the runner (5000 ms) and took 16 ms after an
+   `ANALYZE`, reproduced in a scratch database restored from a dump. A freshly loaded database has
+   no planner statistics until autovacuum runs, and nothing waits for it in CI. The gate then ran on
+   one case fewer than its baseline and **still passed**, inside the 2 pp tolerance. Two fixes:
+   `scripts/seed.py` now ends with `ANALYZE`, and the gate has an explicit check, *every reference
+   query ran*, so a missing case fails loudly instead of shrinking the population.
+2. **The sabotage was proven on a real runner**, not only with `monkeypatch`: a throwaway pull
+   request that let stacked queries through turned `test` and `eval-gate` red while `lint` stayed
+   green. It was closed without merging and its branch deleted.
+3. The evaluation CLI probes a profile before running it, with the profile's own token budget. A
+   64-token cap made a reasoning model run out of tokens while thinking and look unavailable.
