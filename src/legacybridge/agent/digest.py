@@ -20,6 +20,8 @@ def years_covered(o: Ontology) -> tuple[int, int] | None:
 
 
 def digest(o: Ontology, *, terms: bool = True) -> str:
+    if not (o.metrics or o.entities or o.terms):
+        return ""  # no semantic layer: the prompts that would carry this text drop it too
     lines = []
     if years := years_covered(o):
         lines.append(f"Data covers calendar years {years[0]} to {years[1]}.")

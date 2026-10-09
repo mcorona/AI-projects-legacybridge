@@ -12,6 +12,8 @@ from legacybridge.agent.schemas import AgentConfig
 from legacybridge.llm.base import LLMClient
 from legacybridge.llm.openai_compat import OpenAICompatClient
 from legacybridge.llm.profiles import assert_data_allowed, load_profile
+from legacybridge.mcp_server.tools import LegacyTools
+from legacybridge.semantic.loader import empty_ontology
 
 
 def build_llm(profile_name: str) -> LLMClient:
@@ -35,6 +37,14 @@ async def open_agent(
     client = llm or build_llm(profile)
     name = escalation_profile or os.environ.get("LB_ESCALATION_PROFILE", "").strip() or None
     second = escalation_llm or (build_llm(name) if name and name != profile else None)
-    tools = McpToolBackend.stdio() if backend == "mcp" else McpToolBackend.in_memory()
+    semantic = config is None or config.semantic
+    if backend == "mcp" and not semantic:
+        raise ValueError("the no-semantic ablation needs the in-memory backend (backend='local')")
+    if backend == "mcp":
+        tools = McpToolBackend.stdio()
+    else:
+        tools = McpToolBackend.in_memory(
+            None if semantic else LegacyTools(ontology=empty_ontology())
+        )
     async with tools as opened:
         yield Agent(client, opened, config=config, escalation_llm=second)

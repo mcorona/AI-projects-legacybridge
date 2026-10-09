@@ -9,11 +9,16 @@ from typing import Any
 from legacybridge.agent.backends import ToolBackend
 from legacybridge.agent.events import Recorder
 from legacybridge.agent.loop import QueryRun, compact, run_tool_loop
-from legacybridge.agent.roles.planner import PROMPTS
+from legacybridge.agent.prompt_loader import load_prompt
 from legacybridge.agent.schemas import AgentConfig
 from legacybridge.llm.base import LLMClient, ToolSpec
 
 VERIFIER_TOOLS = {"describe_table", "explain_business_term", "run_query"}
+
+
+def verifier_tools(semantic: bool = True) -> set[str]:
+    return VERIFIER_TOOLS if semantic else VERIFIER_TOOLS - {"explain_business_term"}
+
 
 SUBMIT_VERDICT = ToolSpec(
     "submit_verdict",
@@ -104,8 +109,9 @@ async def run_verifier(
     prompt = "verifier_write.md" if mode == "write" else "verifier.md"
     loop = await run_tool_loop(
         llm=llm, backend=backend, rec=rec, role="verifier",
-        system=(PROMPTS / prompt).read_text(encoding="utf-8"), user=briefing,
-        tools=[s for s in specs if s.name in VERIFIER_TOOLS], finish=SUBMIT_VERDICT,
+        system=load_prompt(prompt, config.semantic), user=briefing,
+        tools=[s for s in specs if s.name in verifier_tools(config.semantic)],
+        finish=SUBMIT_VERDICT,
         max_steps=config.verifier_steps, rows_to_model=config.rows_to_model,
     )  # fmt: skip
     if loop.error is not None:

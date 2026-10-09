@@ -24,7 +24,14 @@ The 80 golden cases (`evals/golden_set.yaml`, still `review: draft`) and the 45 
 | `no-verify` | `AgentConfig(verify=False)`: no independent verifier |
 | `no-semantic` | an empty ontology: no business summary in the prompts, no `explain_business_term`, no rule warnings from `run_query`, no defect notes in `describe_table`, and no semantic signals in the detector |
 
-The ablations remove a component; **no prompt is edited** and the golden set is not touched. The
+The ablations remove a component; the golden set is not touched and **no prompt is tuned**. In the
+`no-semantic` arm the passages of the prompts that refer to what was removed (the ontology tool, the
+rule warnings, the business summary) are dropped **mechanically**: they are marked in the prompt
+files and `agent/prompt_loader.py` removes them, adding only the words that close a sentence.
+Leaving them in would measure the model's confusion about a tool that does not exist. The `full`
+arm uses the prompts byte for byte as in earlier phases (`tests/fixtures/prompts_phase5/` pins them).
+The general caution that the database has known defects stays in the `no-semantic` prompt: it is not
+part of the ontology, and a verifier that is not warned at all would not be an ordinary one. The
 `full` arm runs on both profiles, the ablations on `local-qwen` only: it is free and stable, while a
 free-tier model changes from one day to the next and cannot anchor a comparison between arms.
 

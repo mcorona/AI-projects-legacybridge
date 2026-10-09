@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
 from legacybridge.agent.events import Recorder
+from legacybridge.agent.prompt_loader import load_prompt
 from legacybridge.llm.base import InvalidModelOutput, LLMClient, LLMError, Message
-
-PROMPTS = Path(__file__).resolve().parents[1] / "prompts"
 
 
 class PlannerDecision(BaseModel):
@@ -55,9 +53,9 @@ def extract_json(text: str) -> dict:
 
 
 async def run_planner(
-    llm: LLMClient, rec: Recorder, question: str, digest_text: str
+    llm: LLMClient, rec: Recorder, question: str, digest_text: str, semantic: bool = True
 ) -> PlannerDecision:
-    system = (PROMPTS / "planner.md").read_text(encoding="utf-8").replace("{digest}", digest_text)
+    system = load_prompt("planner.md", semantic).replace("{digest}", digest_text)
     messages = [Message.system(system), Message.user(question)]
     last_error: Exception | None = None
     for _ in range(2):  # one retry with a reminder, then give up

@@ -233,5 +233,10 @@ def _normalize(text: str) -> str:
 
 
 @lru_cache(maxsize=1)
+def empty_ontology() -> Ontology:
+    """No terms, no defects, no metrics: the system without its semantic layer (ADR-013)."""
+    return Ontology(terms=[], defects=[])
+
+
 def load_ontology(path: Path = ONTOLOGY_PATH) -> Ontology:
     return Ontology.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))

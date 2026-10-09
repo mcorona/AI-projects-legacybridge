@@ -101,3 +101,4 @@ class AgentConfig(BaseModel):
     rows_to_model: int = 30  # rows of a result shown to a model
     evidence_rows: int = 20  # rows kept in the result
     swar_action: Literal["gate", "annotate", "off"] = "gate"  # ADR-012
+    semantic: bool = True  # False = the no-semantic ablation: an empty ontology (ADR-013)

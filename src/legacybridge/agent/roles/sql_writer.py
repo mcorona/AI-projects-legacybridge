@@ -9,12 +9,14 @@ from typing import Any
 from legacybridge.agent.backends import ToolBackend
 from legacybridge.agent.events import Recorder
 from legacybridge.agent.loop import QueryRun, run_tool_loop
-from legacybridge.agent.roles.planner import PROMPTS, PlannerDecision
+from legacybridge.agent.prompt_loader import load_prompt
+from legacybridge.agent.roles.planner import PlannerDecision
 from legacybridge.agent.schemas import AgentConfig
 from legacybridge.llm.base import LLMClient, ToolSpec
 
 READ_TOOLS = {"list_tables", "describe_table", "sample_rows", "run_query", "explain_business_term"}
 WRITE_TOOL = "propose_write"
+ONTOLOGY_TOOL = "explain_business_term"
 
 SUBMIT_ANSWER = ToolSpec(
     "submit_answer",
@@ -51,9 +53,12 @@ class WriterOutcome:
     )
 
 
-def tools_for(specs: list[ToolSpec], mode: str) -> list[ToolSpec]:
-    """Least privilege by intent: a read-only plan never sees propose_write (ADR-002)."""
+def tools_for(specs: list[ToolSpec], mode: str, semantic: bool = True) -> list[ToolSpec]:
+    """Least privilege by intent: a read-only plan never sees propose_write (ADR-002). Without the
+    semantic layer there is no ontology tool to offer either (ADR-013)."""
     names = READ_TOOLS | ({WRITE_TOOL} if mode == "write" else set())
+    if not semantic:
+        names = names - {ONTOLOGY_TOOL}
     return [s for s in specs if s.name in names]
 
 
@@ -71,12 +76,9 @@ async def run_writer(
     feedback: str | None = None,
     watch: Callable[[], bool] | None = None,
 ) -> WriterOutcome:
-    write_rules = (
-        (PROMPTS / "write_rules.md").read_text(encoding="utf-8") if mode == "write" else ""
-    )
+    write_rules = load_prompt("write_rules.md", config.semantic) if mode == "write" else ""
     system = (
-        (PROMPTS / "sql_writer.md")
-        .read_text(encoding="utf-8")
+        load_prompt("sql_writer.md", config.semantic)
         .replace("{write_rules}", write_rules)
         .replace("{language}", "Spanish" if plan.language == "es" else "English")
         .replace("{digest}", digest_text)
@@ -89,7 +91,8 @@ async def run_writer(
         )
     loop = await run_tool_loop(
         llm=llm, backend=backend, rec=rec, role="sql_writer", system=system, user=user,
-        tools=tools_for(specs, mode), finish=SUBMIT_ANSWER, max_steps=config.max_steps,
+        tools=tools_for(specs, mode, config.semantic), finish=SUBMIT_ANSWER,
+        max_steps=config.max_steps,
         rows_to_model=config.rows_to_model,
         # A queued request is the whole outcome of a write: the status line is built from the real
         # result, so asking the model to describe it adds a call and a way to fail.

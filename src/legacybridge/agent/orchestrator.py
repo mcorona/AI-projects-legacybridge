@@ -30,7 +30,7 @@ from legacybridge.agent.schemas import AgentConfig, AgentResult, Evidence, Verdi
 from legacybridge.llm.base import InvalidModelOutput, LLMClient, LLMError, ToolSpec
 from legacybridge.observability.swar_config import load_swar_config
 from legacybridge.observability.swar_detector import RunFacts, assess, facts_from_result
-from legacybridge.semantic.loader import Ontology, load_ontology
+from legacybridge.semantic.loader import Ontology, empty_ontology, load_ontology
 
 MESSAGES = {
     "verification_failed": {
@@ -122,6 +122,8 @@ class Agent:
         self.llm, self.backend = llm, backend
         self.config = config or AgentConfig()
         self.ontology = ontology or load_ontology()
+        if not self.config.semantic:
+            self.ontology = empty_ontology()  # the ablation: no digest, no semantic signals
         self.escalation_llm = escalation_llm
         self.tracer = tracer
         self.swar = load_swar_config()
@@ -206,7 +208,9 @@ class Agent:
     async def _plan(self, question: str, rec: Recorder) -> PlannerDecision:
         try:
             with rec.role("planner"):
-                return await run_planner(self.llm, rec, question, self._digest)
+                return await run_planner(
+                    self.llm, rec, question, self._digest, self.config.semantic
+                )
         except InvalidModelOutput:
             # Failing safe: a read plan cannot even see propose_write, so nothing can be queued.
             return PlannerDecision(action="query", intent=question)
