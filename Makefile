@@ -1,4 +1,4 @@
-.PHONY: db-up db-reset seed test lint obs-up obs-down demo demo-gif eval eval-gate eval-report infra-test synth bootstrap deploy destroy aws-leftovers
+.PHONY: db-up db-reset seed test lint obs-up obs-down demo demo-gif eval eval-gate eval-report infra-test synth bootstrap deploy destroy aws-leftovers docs-check
 
 # Starts Postgres (creates .env from .env.example on first run) and waits until it is healthy.
 db-up:
@@ -86,3 +86,9 @@ destroy:
 
 aws-leftovers:
 	AWS_PROFILE=$(AWS_PROFILE) uv run python -m scripts.aws_leftovers
+
+# The documentation is checked like code: links, citations, counts and the generated parts.
+docs-check:
+	uv run pytest tests/test_docs.py tests/test_cost_model.py -q
+	uv run python -m scripts.readme_results --check
+	uv run python -m scripts.cost_model --check

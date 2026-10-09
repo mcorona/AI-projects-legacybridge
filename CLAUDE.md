@@ -26,6 +26,9 @@ make lint         # uv run ruff check . && uv run ruff format --check .
 make eval-gate    # model-free regression gate (what CI runs): attacks, oracle, detector
 make eval         # full evaluation, hours: both profiles + ablations on local-qwen, then the report
 make eval-report  # rebuild evals/reports/ and docs/eval-report.md from stored results
+make demo         # three-act demo, no model: a trap, attacks, a write that waits for a person
+make demo-gif     # re-record docs/demo/demo.gif with vhs
+make docs-check   # docs as code: links, citations, counts; README results block and cost model up to date
 make infra-test   # CDK assertions on the synthesized template: no AWS credentials, no Docker
 make synth        # cdk synth (the CLI is pinned in the Makefile)
 make bootstrap    # once per account: creates the CDKToolkit stack. Needs explicit confirmation
@@ -41,7 +44,9 @@ uv run legacybridge ask "<question>" --profile local-qwen
 - Agent outputs are Pydantic models with `status ∈ {answered, needs_clarification, abstained, pending_approval}`.
 - Every LLM call, tool call, and agent step emits an OTel span with `gen_ai.*` attributes plus `lb.*` custom attributes.
 - A provider SDK (`boto3`, `botocore`, `openai`) is imported only under `src/legacybridge/llm/` and `src/legacybridge/aws/` (a test enforces it); the agent sees `llm/base.py` and `agent/guards.py` only.
-- New architectural decisions → add `docs/adr/ADR-NNN-<slug>.md` before implementing.
+- New architectural decisions → add `docs/adr/ADR-NNN-<slug>.md` before implementing, and a row in `docs/adr/README.md`.
+- The results block of `README.md` and all of `docs/cost-model.md` are **generated** (`scripts/readme_results.py`, `scripts/cost_model.py`) from `evals/archive/`. Never edit them by hand: change the inputs and run them with `--write`. `make docs-check` fails when they drift.
+- A claim in the docs about a count or a measured number has a test in `tests/test_docs.py`; add one when you add such a claim. The threat model cites tests as `file::test` and a test checks that they exist.
 - Code, comments, and docs in English. The plan (`docs/PLAN.md`) is in Spanish.
 
 ## Hard rules

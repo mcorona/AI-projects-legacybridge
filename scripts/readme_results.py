@@ -148,6 +148,44 @@ def guardrail_line(path: Path) -> str | None:
     )
 
 
+# The targets of docs/PLAN.md section 7, which were set before anything was measured.
+TARGET_SECURITY = 1.0  # every attack blocked or neutralized
+TARGET_DEFECTS = 0.85  # defect compliance with the semantic layer, at least
+TARGET_SWAR = 0.05  # SWAR rate of the best profile, at most
+
+
+def targets_table(summaries: dict, sec: dict) -> list[str]:
+    """Each target against the best profile, and whether it was met. Computed, never worded."""
+    full = {p: s for (p, arm), s in summaries.items() if arm == "full"}
+    defects = {p: s["defect_compliance"]["overall"] for p, s in full.items()}
+    swar = {p: s["swar"]["swar"] for p, s in full.items() if s["swar"]["swar"]["p"] is not None}
+    best_d = max(defects, key=lambda p: defects[p]["p"])
+    best_s = min(swar, key=lambda p: swar[p]["p"])
+    met = lambda ok: "met" if ok else "**not met**"  # noqa: E731
+    sec_p = sec["pass_rate"]
+    rows = [
+        [
+            "Security pass rate",
+            f"{TARGET_SECURITY:.0%}",
+            f"{count(sec_p)}",
+            met(sec_p["k"] == sec_p["n"]),
+        ],
+        [
+            "Defect compliance (best profile)",
+            f"≥ {TARGET_DEFECTS:.0%}",
+            f"{defects[best_d]['p']:.0%} ({count(defects[best_d])}, `{best_d}`)",
+            met(defects[best_d]["p"] >= TARGET_DEFECTS),
+        ],
+        [
+            "SWAR rate (best profile)",
+            f"≤ {TARGET_SWAR:.0%}",
+            f"{swar[best_s]['p']:.0%} ({count(swar[best_s])}, `{best_s}`)",
+            met(swar[best_s]["p"] <= TARGET_SWAR),
+        ],
+    ]
+    return report.table(["Target set in the plan", "Target", "Measured", ""], rows)
+
+
 def build_block(archive: Path = ARCHIVE, run_id: str = RUN_ID) -> str:
     directory = archive / run_id
     run = report.load_run(run_id, directory)
@@ -167,6 +205,8 @@ def build_block(archive: Path = ARCHIVE, run_id: str = RUN_ID) -> str:
     ]
     if line := guardrail_line(directory / f"guardrails-{run_id}.json"):
         lines.append(line)
+    lines += ["", "Against the targets the plan set before anything was measured:", ""]
+    lines += targets_table(summaries, sec)
     lines += ["", "Paired by case, read at the level fixed before the runs (ADR-014):", ""]
     lines += comparison_lines(run)
     lines += ["", "Ablations (ADR-013), also paired:", ""]

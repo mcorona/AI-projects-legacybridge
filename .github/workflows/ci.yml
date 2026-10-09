@@ -1,6 +1,7 @@
 # CI for LegacyBridge (Phase 6, ADR-013).
 #
-# Four independent jobs: lint, the test suite, the eval gate and the AWS stack (ADR-014). None of them needs a model, a
+# Five independent jobs: lint, the test suite, the eval gate, the AWS stack (ADR-014) and the README's
+# quickstart, run exactly as written on a clean runner. None of them needs a model, a
 # secret or network access beyond fetching dependencies: the database is a throwaway Postgres on
 # the runner, seeded with the synthetic data (the passwords in .env.example are development
 # values for that database only).
@@ -114,3 +115,18 @@ jobs:
         run: >
           docker run --rm --entrypoint /var/lang/bin/python -e BEDROCK_CHAT_MODEL=ci legacybridge-lambda
           -c "import legacybridge.aws.worker, legacybridge.aws.db_init, legacybridge.aws.front, scripts.seed"
+
+  quickstart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: The README quickstart, as written (git clone and cd are skipped, the runner checked out)
+        run: uv run python -m scripts.check_quickstart
