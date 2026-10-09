@@ -16,6 +16,7 @@
 terms:
   - name: sales
     aliases: [ventas, facturación, facturacion, facturado, vendimos, vendido]
+    requires_period: true   # a sales figure means nothing without a period (the SWAR detector checks it)
     definition: >-
       Latest capture per (serie, numfac) with faccab.status = 'V', summing faccab.total parsed from
       text, in the invoice's own currency. Never add MXN and USD. See the metrics facturacion_total

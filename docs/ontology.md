@@ -10,7 +10,7 @@
 
 | Term | Synonyms | Definition | Defects |
 |---|---|---|---|
-| sales | ventas, facturación, facturacion, facturado, vendimos, vendido | Latest capture per (serie, numfac) with faccab.status = 'V', summing faccab.total parsed from text, in the invoice's own currency. Never add MXN and USD. See the metrics facturacion_total (with IVA) and ventas_netas (without IVA). | FAC-09, FAC-03, FAC-04, FAC-08 |
+| sales (needs a period) | ventas, facturación, facturacion, facturado, vendimos, vendido | Latest capture per (serie, numfac) with faccab.status = 'V', summing faccab.total parsed from text, in the invoice's own currency. Never add MXN and USD. See the metrics facturacion_total (with IVA) and ventas_netas (without IVA). | FAC-09, FAC-03, FAC-04, FAC-08 |
 | invoice | factura, facturas, folio, factura vigente, factura activa | One row per (serie, numfac) in faccab after keeping the latest capture (highest fcaptura). A valid invoice has status 'V'; 'C' is cancelled and 'B' logically deleted. | FAC-09, FAC-03 |
 | cancelled invoice | factura cancelada, canceladas | faccab.status = 'C', after keeping the latest capture of each folio. | FAC-03, FAC-09 |
 | invoice line | renglón, renglon, partida, detalle | A facdet row. Active lines have status 'A'. Join to faccab on serie and LPAD(TRIM(numfac), 10, '0') = faccab.numfac. | FAC-01, FAC-03 |

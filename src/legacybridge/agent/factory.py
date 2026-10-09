@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -28,8 +29,12 @@ async def open_agent(
     backend: str = "mcp",
     config: AgentConfig | None = None,
     llm: LLMClient | None = None,
+    escalation_profile: str | None = None,
+    escalation_llm: LLMClient | None = None,
 ) -> AsyncIterator[Agent]:
     client = llm or build_llm(profile)
+    name = escalation_profile or os.environ.get("LB_ESCALATION_PROFILE", "").strip() or None
+    second = escalation_llm or (build_llm(name) if name and name != profile else None)
     tools = McpToolBackend.stdio() if backend == "mcp" else McpToolBackend.in_memory()
     async with tools as opened:
-        yield Agent(client, opened, config=config)
+        yield Agent(client, opened, config=config, escalation_llm=second)

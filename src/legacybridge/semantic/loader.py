@@ -52,6 +52,7 @@ class Term(BaseModel):
     aliases: list[str] = Field(default_factory=list)
     definition: str
     defects: list[str] = Field(default_factory=list)
+    requires_period: bool = False  # the figure is meaningless without a period
 
 
 class TableDoc(BaseModel):
@@ -172,6 +173,17 @@ class Ontology(BaseModel):
             if wanted == _normalize(j.name):
                 return Resolved("join", j)
         return None
+
+    def terms_in(self, text: str) -> list[Term]:
+        """Glossary terms that appear in ``text`` (whole-word match on a name or a synonym)."""
+        lowered = _normalize(text)
+        found = []
+        for t in self.terms:
+            for label in (t.name, *t.aliases):
+                if re.search(rf"(?<!\w){re.escape(_normalize(label))}(?!\w)", lowered):
+                    found.append(t)
+                    break
+        return found
 
     def suggest(self, term: str, n: int = 3) -> list[str]:
         names: dict[str, str] = {}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -68,6 +69,7 @@ async def run_writer(
     mode: str,
     config: AgentConfig,
     feedback: str | None = None,
+    watch: Callable[[], bool] | None = None,
 ) -> WriterOutcome:
     write_rules = (
         (PROMPTS / "write_rules.md").read_text(encoding="utf-8") if mode == "write" else ""
@@ -92,6 +94,7 @@ async def run_writer(
         # A queued request is the whole outcome of a write: the status line is built from the real
         # result, so asking the model to describe it adds a call and a way to fail.
         stop_after_ok=frozenset({WRITE_TOOL}) if mode == "write" else frozenset(),
+        watch=watch,
     )  # fmt: skip
 
     out = WriterOutcome(outcome="no_finish", queries=loop.queries, loop_reason=loop.reason)

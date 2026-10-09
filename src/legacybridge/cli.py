@@ -15,6 +15,7 @@ from legacybridge.agent.schemas import AgentConfig, AgentResult
 from legacybridge.env import load_env
 from legacybridge.llm.base import LLMClient, LLMError
 from legacybridge.llm.profiles import ProfileError
+from legacybridge.observability.tracing import setup_tracing, shutdown_tracing
 
 
 def format_result(r: AgentResult) -> str:
@@ -44,8 +45,16 @@ def format_result(r: AgentResult) -> str:
 
 
 async def _ask(args: argparse.Namespace, llm: LLMClient | None) -> AgentResult:
-    config = AgentConfig(verify=not args.no_verify, max_steps=args.max_steps)
-    async with open_agent(args.profile, backend=args.backend, config=config, llm=llm) as agent:
+    config = AgentConfig(
+        verify=not args.no_verify, max_steps=args.max_steps, swar_action=args.swar_action
+    )
+    async with open_agent(
+        args.profile,
+        backend=args.backend,
+        config=config,
+        llm=llm,
+        escalation_profile=args.escalation_profile,
+    ) as agent:
         return await agent.ask(args.question)
 
 
@@ -90,6 +99,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="mcp starts the real server (default); local runs it in-process",
     )
     ask.add_argument("--max-steps", type=int, default=10)
+    ask.add_argument(
+        "--swar-action",
+        choices=("gate", "annotate", "off"),
+        default="gate",
+        help="early warning: gate acts (escalate, clarify, abstain); annotate only reports",
+    )
+    ask.add_argument(
+        "--escalation-profile",
+        help="profile to rerun on when the early warning escalates (or LB_ESCALATION_PROFILE)",
+    )
 
     serve = sub.add_parser("serve", help="run the HTTP API")
     serve.add_argument("--host", default="127.0.0.1")
@@ -119,7 +138,11 @@ def main(
     args = build_parser().parse_args(argv)
     try:
         if args.command == "ask":
-            result = anyio.run(_ask, args, llm)
+            setup_tracing("legacybridge")
+            try:
+                result = anyio.run(_ask, args, llm)
+            finally:
+                shutdown_tracing()  # a short-lived process must flush its spans before it exits
             print(result.model_dump_json(indent=2) if args.json else format_result(result))
             return 0
         if args.command == "serve":

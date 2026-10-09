@@ -66,8 +66,9 @@ def render(o: Ontology) -> str:
         "|---|---|---|---|",
     ]
     for t in o.terms:
+        needs = " (needs a period)" if t.requires_period else ""
         out.append(
-            f"| {t.name} | {_cell(', '.join(t.aliases))} | {_cell(t.definition)} | "
+            f"| {t.name}{needs} | {_cell(', '.join(t.aliases))} | {_cell(t.definition)} | "
             f"{', '.join(t.defects)} |"
         )
 

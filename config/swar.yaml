@@ -1,0 +1,54 @@
+# SWAR risk model (ADR-012). Everything here is a PRIOR written down before measuring: the weights
+# are NOT fitted to the golden set. Change them only for a reason you can state without looking at
+# the evaluation numbers, and record it in the ADR.
+#
+#   risk = 1 - prod(1 - w_i)            noisy-OR over the signals that fired
+#   a group's contribution is capped    (see `groups`)
+#
+# available_at says when a signal can be known: trajectory (while the writer works), writer (once
+# it has finished, before the verifier) or final (after the verifier).
+version: 1
+
+thresholds:
+  elevated: 0.40     # risk >= this is reported as "elevated"
+  high: 0.70         # risk >= this is reported as "high"
+
+early_warning:
+  action_threshold: 0.70       # at C1/C2, risk at or above this makes the agent act
+  checkpoint_tool_results: 6   # C1: look after this many tool results of the writer
+
+groups:
+  # The static defect rules are heuristic: on neutral golden cases they raised a warning 8 times
+  # in 35 (tests/test_semantic.py). A lone heuristic must not be able to trigger an action, so
+  # everything derived from the rules together is capped below the action threshold. It can still
+  # tip the balance when something independent agrees (a figure not in the evidence, zero rows...).
+  rules: {cap: 0.60}
+
+trajectory:
+  repeated_calls: 3        # identical tool calls (same role, tool and arguments)
+  cascade_length: 3        # consecutive failing tool calls
+  sql_rejections: 2        # rejected or failing run_query calls
+  sql_rejections_many: 4
+
+signals:
+  # ---- result
+  verifier_disagreed_final:   {family: result, weight: 0.90, available_at: final}
+  verifier_disagreed_retried: {family: result, weight: 0.35, available_at: final}
+  unresolved_violations:      {family: result, weight: 0.50, available_at: writer, group: rules}
+  zero_rows:                  {family: result, weight: 0.40, available_at: writer}
+  truncation_unacknowledged:  {family: result, weight: 0.50, available_at: writer}
+  figures_not_in_evidence:    {family: result, weight: 0.60, available_at: writer}
+  no_evidence:                {family: result, weight: 0.50, available_at: final}
+  no_independent_check:       {family: result, weight: 0.25, available_at: final}
+  unverified:                 {family: result, weight: 0.25, available_at: final}
+  # ---- trajectory
+  repeated_tool_call:   {family: trajectory, weight: 0.40, available_at: trajectory}
+  error_cascade:        {family: trajectory, weight: 0.50, available_at: trajectory}
+  sql_rejections:       {family: trajectory, weight: 0.30, available_at: trajectory}
+  sql_rejections_many:  {family: trajectory, weight: 0.50, available_at: trajectory}
+  writer_retry:         {family: trajectory, weight: 0.30, available_at: trajectory}
+  model_retries:        {family: trajectory, weight: 0.20, available_at: trajectory}
+  step_limit:           {family: trajectory, weight: 0.60, available_at: final}
+  # ---- semantics
+  question_defect_violated: {family: semantics, weight: 0.70, available_at: writer, group: rules}
+  unstated_parameter:       {family: semantics, weight: 0.75, available_at: writer}

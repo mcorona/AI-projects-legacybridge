@@ -26,6 +26,7 @@ from legacybridge.agent.schemas import AgentConfig, AgentResult
 from legacybridge.env import load_env
 from legacybridge.llm.base import LLMError
 from legacybridge.llm.profiles import ProfileError
+from legacybridge.observability.tracing import setup_tracing, shutdown_tracing
 
 AgentRunner = Callable[[str, str, bool], Awaitable[AgentResult]]  # question, profile, verify
 
@@ -49,6 +50,7 @@ def create_app(
     token: str | None = None,
 ) -> FastAPI:
     load_env()
+    setup_tracing("legacybridge-api")
     secret = token if token is not None else os.environ.get("LB_API_TOKEN", "")
     service = approvals or ApprovalService()
     state: dict[str, Any] = {"run": runner} if runner is not None else {}
@@ -69,7 +71,10 @@ def create_app(
                 return await agent.ask(question)
 
             state["run"] = run
-            yield
+            try:
+                yield
+            finally:
+                shutdown_tracing()
 
     app = FastAPI(title="LegacyBridge", version="0.1.0", lifespan=lifespan)
 

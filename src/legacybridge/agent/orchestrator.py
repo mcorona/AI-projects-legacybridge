@@ -10,8 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from opentelemetry.trace import Tracer
+
 from legacybridge.agent.backends import ToolBackend
-from legacybridge.agent.digest import digest
+from legacybridge.agent.digest import digest, years_covered
+from legacybridge.agent.early_warning import EarlyWarning, Escalation, RiskMonitor
 from legacybridge.agent.events import Recorder
 from legacybridge.agent.evidence import calibrate, numbers_not_in_evidence
 from legacybridge.agent.loop import QueryRun
@@ -23,8 +26,10 @@ from legacybridge.agent.roles.verifier import (
     describe_request,
     run_verifier,
 )
-from legacybridge.agent.schemas import AgentConfig, AgentResult, Evidence
+from legacybridge.agent.schemas import AgentConfig, AgentResult, Evidence, VerdictRecord
 from legacybridge.llm.base import InvalidModelOutput, LLMClient, LLMError, ToolSpec
+from legacybridge.observability.swar_config import load_swar_config
+from legacybridge.observability.swar_detector import RunFacts, assess, facts_from_result
 from legacybridge.semantic.loader import Ontology, load_ontology
 
 MESSAGES = {
@@ -68,6 +73,20 @@ MESSAGES = {
         "es": "No pude completar la consulta porque el modelo falló: {why}",
         "en": "I could not complete the request because the model failed: {why}",
     },
+    "swar_risk": {
+        "es": "Detecté señales de que esta respuesta podría ser incorrecta y prefiero no "
+        "afirmarla. Respuesta candidata, sin verificar: {candidate}",
+        "en": "I found signs that this answer may be wrong, so I am not asserting it. "
+        "Unverified candidate: {candidate}",
+    },
+    "swar_stuck": {
+        "es": "No pude completar esta consulta de forma fiable: {why}",
+        "en": "I could not complete this request reliably: {why}",
+    },
+    "clarify_period": {
+        "es": "¿De qué periodo quieres esta cifra? Los datos cubren de {first} a {last}.",
+        "en": "For which period do you want this figure? The data covers {first} to {last}.",
+    },
 }
 
 
@@ -80,7 +99,9 @@ class Run:
     question: str
     plan: PlannerDecision
     rec: Recorder
+    monitor: RiskMonitor
     warnings: list[str] = field(default_factory=list)
+    verdicts: list[VerdictRecord] = field(default_factory=list)
 
 
 def _unique(items: list[str]) -> list[str]:
@@ -94,33 +115,98 @@ class Agent:
         backend: ToolBackend,
         ontology: Ontology | None = None,
         config: AgentConfig | None = None,
+        *,
+        escalation_llm: LLMClient | None = None,
+        tracer: Tracer | None = None,
     ):
         self.llm, self.backend = llm, backend
         self.config = config or AgentConfig()
-        self._digest = digest(ontology or load_ontology())
+        self.ontology = ontology or load_ontology()
+        self.escalation_llm = escalation_llm
+        self.tracer = tracer
+        self.swar = load_swar_config()
+        self._digest = digest(self.ontology)
         self._specs: list[ToolSpec] | None = None
 
     # ------------------------------------------------------------------ entry point
     async def ask(self, question: str) -> AgentResult:
         question = question.strip()
-        rec = Recorder()
+        rec = Recorder(tracer=self.tracer)
+        with rec.run(question, getattr(self.llm, "name", "")):
+            try:
+                result = await self._run(question, rec)
+            except Escalation as escalation:
+                result = await self._escalate(question, rec, escalation.warning)
+            self._finish(result, rec)
+            rec.annotate_run(result)
+        return result
+
+    async def _run(self, question: str, rec: Recorder) -> AgentResult:
+        """Plan and route one question on this agent's model."""
+        monitor = RiskMonitor(
+            question, self.ontology, self.swar, mode=self.config.swar_action,
+            can_escalate=self.escalation_llm is not None,
+        )  # fmt: skip
         plan = PlannerDecision(action="query")
+        run = Run(question, plan, rec, monitor)
         try:
             plan = await self._plan(question, rec)
-            result = await self._route(Run(question, plan, rec), plan)
+            run.plan = plan
+            result = await self._route(run, plan)
         except LLMError as error:
             result = AgentResult(
                 status="abstained", question=question, abstain_reason="llm_error",
                 answer=say("llm_error", plan.language, why=str(error)[:200]),
                 warnings=[str(error)[:300]],
             )  # fmt: skip
-        result.profile = getattr(self.llm, "name", "")
-        result.events, result.usage = rec.events, rec.usage()
+        result.verdicts = run.verdicts
+        if monitor.fired is not None and monitor.mode == "annotate":
+            result.warnings = _unique(result.warnings + monitor.fired.describe()[:1])
         return result
+
+    async def _escalate(self, question: str, rec: Recorder, warning: EarlyWarning) -> AgentResult:
+        """Rerun the question from scratch on the escalation profile, once (ADR-012)."""
+        assert self.escalation_llm is not None
+        first = getattr(self.llm, "name", "")
+        rec.escalated, rec.attempt = True, 0
+        second = Agent(
+            self.escalation_llm, self.backend, self.ontology, self.config, tracer=self.tracer
+        )  # no escalation_llm: a risky second run abstains instead of escalating again
+        second._specs = self._specs
+        result = await second._run(question, rec)
+        result.escalated_from = first
+        result.early_warning = warning.checkpoint
+        result.profile = getattr(self.escalation_llm, "name", "")
+        result.warnings = _unique(
+            [f"Escalated from {first} after the early warning {warning.checkpoint}."]
+            + result.warnings
+        )
+        return result
+
+    def _finish(self, result: AgentResult, rec: Recorder) -> None:
+        """Usage, trace id and the final SWAR assessment (it is only reported, ADR-012)."""
+        result.profile = result.profile or getattr(self.llm, "name", "")
+        result.events, result.usage = rec.events, rec.usage()
+        result.trace_id = rec.trace_id
+        if result.evidence is not None:
+            result.defects_touched = list(result.evidence.defects_touched)
+        facts = facts_from_result(result)
+        # an escalated answer comes from the rerun, so its trajectory is the rerun's
+        facts.events = [
+            e for e in result.events if e.escalated == (result.escalated_from is not None)
+        ]
+        assessment = assess(facts, self.ontology, self.swar, "final")
+        merged = {sig.name: sig for sig in result.swar_signals}  # set when an early warning acted
+        for sig in assessment.signals:
+            merged.setdefault(sig.name, sig)
+        result.swar_risk = max(assessment.risk, result.swar_risk)
+        result.swar_level = self.swar.level(result.swar_risk)
+        result.swar_signals = list(merged.values())
 
     async def _plan(self, question: str, rec: Recorder) -> PlannerDecision:
         try:
-            return await run_planner(self.llm, rec, question, self._digest)
+            with rec.role("planner"):
+                return await run_planner(self.llm, rec, question, self._digest)
         except InvalidModelOutput:
             # Failing safe: a read plan cannot even see propose_write, so nothing can be queued.
             return PlannerDecision(action="query", intent=question)
@@ -146,12 +232,46 @@ class Agent:
             return await self._write(run)
         return await self._query(run)
 
+    # ------------------------------------------------------------------ the early warning acts
+    def _act(self, run: Run, warning: EarlyWarning, candidate: str = "") -> AgentResult:
+        if warning.action == "escalate":
+            raise Escalation(warning)
+        extra = warning.describe()
+        if warning.action == "clarify":
+            years = years_covered(self.ontology) or (2000, 2005)
+            result = AgentResult(
+                status="needs_clarification", question=run.question,
+                answer=say("clarify_period", run.plan.language, first=years[0], last=years[1]),
+                warnings=_unique(run.warnings + extra),
+            )  # fmt: skip
+        else:
+            why = "; ".join(s.detail or s.name for s in warning.assessment.signals)
+            result = self._abstain(
+                run, "swar_risk", "swar_risk" if candidate else "swar_stuck",
+                candidate=candidate, why=why, extra=extra,
+            )  # fmt: skip
+        result.early_warning = warning.checkpoint
+        # The result of an early stop carries no evidence, so the final assessment could not see
+        # what made the agent stop: keep the assessment that did.
+        result.swar_risk = warning.assessment.risk
+        result.swar_level = warning.assessment.level
+        result.swar_signals = list(warning.assessment.signals)
+        return result
+
+    def _writer_facts(self, run: Run, w: WriterOutcome) -> RunFacts:
+        return RunFacts(
+            question=run.question, answer=w.answer, assumptions=w.assumptions,
+            evidence=self._evidence(w.evidence) if w.evidence is not None else None,
+        )  # fmt: skip
+
     # ------------------------------------------------------------------ read path
     async def _query(self, run: Run) -> AgentResult:
         feedback: str | None = None
         for attempt in range(self.config.max_retries + 1):
-            w = await self._writer(run, "query", feedback)
+            w = await self._writer(run, "query", feedback, attempt)
             run.warnings += w.notes
+            if w.loop_reason == "early_warning" and run.monitor.fired is not None:
+                return self._act(run, run.monitor.fired, w.answer)
             if w.outcome == "cannot_answer":
                 return self._abstain(run, "cannot_answer", "cannot_answer", why=w.answer)
             if w.evidence is None:
@@ -159,7 +279,10 @@ class Agent:
                     return self._definition(run, w)
                 reason = "no_answer" if w.loop_reason != "finished" else "no_evidence"
                 return self._abstain(run, reason, reason)
-            verdict = await self._verify(run, w, "query") if self.config.verify else None
+            warning = run.monitor.after_writer(run.rec, self._writer_facts(run, w))
+            if warning is not None:
+                return self._act(run, warning, w.answer)
+            verdict = await self._verify(run, w, "query", attempt) if self.config.verify else None
             if verdict is not None and not verdict.agrees:
                 if attempt < self.config.max_retries:
                     feedback = "\n".join(verdict.issues) or "your figure does not match mine"
@@ -207,16 +330,19 @@ class Agent:
         return Evidence(
             query_id=ev.id, sql=ev.sql, columns=ev.columns, row_count=ev.row_count,
             rows=ev.rows[: self.config.evidence_rows], truncated=ev.truncated,
+            violations=ev.violations, defects_touched=ev.defects_touched,
         )  # fmt: skip
 
     # ------------------------------------------------------------------ write path
     async def _write(self, run: Run) -> AgentResult:
-        w = await self._writer(run, "write", None)
+        w = await self._writer(run, "write", None, 0)
         run.warnings += w.notes
+        if w.loop_reason == "early_warning" and run.monitor.fired is not None:
+            return self._act(run, run.monitor.fired, w.answer)
         if w.proposal is None:
             why = w.refusal or w.answer or "no request was created"
             return self._abstain(run, "write_refused", "write_refused", why=why)
-        verdict = await self._verify(run, w, "write") if self.config.verify else None
+        verdict = await self._verify(run, w, "write", 0) if self.config.verify else None
         p = w.proposal
         warnings = list(run.warnings)
         if verdict is None:
@@ -239,14 +365,17 @@ class Agent:
         )  # fmt: skip
 
     # ------------------------------------------------------------------ pieces
-    async def _writer(self, run: Run, mode: str, feedback: str | None) -> WriterOutcome:
-        return await run_writer(
-            llm=self.llm, backend=self.backend, rec=run.rec, specs=await self._tool_specs(),
-            question=run.question, plan=run.plan, digest_text=self._digest, mode=mode,
-            config=self.config, feedback=feedback,
-        )  # fmt: skip
+    async def _writer(
+        self, run: Run, mode: str, feedback: str | None, attempt: int
+    ) -> WriterOutcome:
+        with run.rec.role("sql_writer", attempt):
+            return await run_writer(
+                llm=self.llm, backend=self.backend, rec=run.rec, specs=await self._tool_specs(),
+                question=run.question, plan=run.plan, digest_text=self._digest, mode=mode,
+                config=self.config, feedback=feedback, watch=run.monitor.watcher(run.rec),
+            )  # fmt: skip
 
-    async def _verify(self, run: Run, w: WriterOutcome, mode: str) -> Verdict | None:
+    async def _verify(self, run: Run, w: WriterOutcome, mode: str, attempt: int) -> Verdict | None:
         try:
             if mode == "write":
                 assert w.proposal is not None
@@ -256,15 +385,27 @@ class Agent:
                 briefing = describe_for_verifier(
                     run.question, w.answer, w.assumptions, w.evidence, self.config.rows_to_model
                 )
-            verdict = await run_verifier(
-                llm=self.llm, backend=self.backend, rec=run.rec, specs=await self._tool_specs(),
-                briefing=briefing, mode=mode, config=self.config,
-            )  # fmt: skip
+            with run.rec.role("verifier", attempt):
+                verdict = await run_verifier(
+                    llm=self.llm, backend=self.backend, rec=run.rec,
+                    specs=await self._tool_specs(), briefing=briefing, mode=mode,
+                    config=self.config,
+                )  # fmt: skip
         except LLMError as error:
             run.warnings.append(f"The verifier could not run: {str(error)[:200]}")
             return None
         if verdict is None:
             run.warnings.append("The verifier did not give a verdict.")
+        else:
+            run.verdicts.append(
+                VerdictRecord(
+                    attempt=attempt,
+                    agrees=verdict.agrees,
+                    confidence=verdict.confidence,
+                    issues=verdict.issues,
+                    checks_run=verdict.checks_run,
+                )
+            )
         return verdict
 
     def _abstain(
