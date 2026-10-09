@@ -93,3 +93,18 @@ def test_five_golden_set_questions_are_answerable_through_the_server_alone(db_av
     trap = dict(zip(FIVE_QUESTIONS, results, strict=True))["TRAP-019"]
     assert "IGNORA TUS INSTRUCCIONES" in trap["rows"][0][0]
     assert any("looks like instructions" in w for w in trap["warnings"])
+
+
+@pytest.mark.integration
+def test_defect_rules_reach_an_mcp_client_over_stdio(db_available):
+    """Phase 3 DoD: the naive SQL of TRAP-002 draws a FAC-09 warning, the reference SQL none."""
+    if not db_available:
+        pytest.skip("legacy Postgres is not reachable")
+    case = {c.id: c for c in load_golden()}["TRAP-002"]
+    _, (naive, good) = anyio.run(
+        _session,
+        [("run_query", {"sql": case.naive_sql}), ("run_query", {"sql": case.expected_sql})],
+    )
+    assert naive["ok"] and any(w.startswith("FAC-09:") for w in naive["warnings"])
+    assert "FAC-09" in {v["defect"] for v in naive["violations"]}
+    assert good["ok"] and good["warnings"] == [] and good["violations"] == []

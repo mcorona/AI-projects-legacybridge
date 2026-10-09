@@ -44,8 +44,18 @@ def test_run_query_success_shape(tools):
     assert out["ok"] and out["columns"] == ["n"] and out["rows"] == [[36]]
     assert out["tables"] == ["clientes"] and out["truncated"] is False
     assert out["sql"].endswith("LIMIT 101")
-    assert any("FAC-03" in w for w in out["warnings"])
     assert out["data_notice"] == policy.DATA_NOTICE
+    # The query handles status explicitly, so the rules have nothing to say (Phase 3).
+    assert out["violations"] == [] and out["warnings"] == []
+    assert "FAC-03" in out["defects_touched"]
+
+
+def test_run_query_warns_when_a_defect_rule_is_broken(tools):
+    out = tools.run_query("SELECT COUNT(*) AS n FROM clientes")
+    assert out["ok"], "rules warn, they never block"
+    assert out["rows"] == [[300]]
+    assert [v["defect"] for v in out["violations"]] == ["FAC-03"]
+    assert any(w.startswith("FAC-03:") and "Fix:" in w for w in out["warnings"])
 
 
 def test_run_query_reports_truncation(tools):
