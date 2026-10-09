@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from legacybridge!")
+"""LegacyBridge: reliable AI agents over legacy enterprise databases."""
