@@ -163,3 +163,17 @@ def test_the_cost_claim_in_the_readme_matches_the_model():
     first = len(UNITS) * 5  # every metric by profile and by each of the four statuses, and alone
     assert first / series_per_profile(4) == pytest.approx(3.67, abs=0.01), "'nearly four times'"
     assert "nearly\n  four times" in README
+
+
+def test_the_mix_of_questions_the_readme_describes_is_the_golden_sets():
+    import collections
+
+    mix = collections.Counter(c.category.value for c in load_golden())
+    assert dict(mix) == {
+        "simple": 15, "join_agg": 20, "defect_trap": 20, "ambiguous": 10, "out_of_scope": 5, "write": 10,
+    }  # fmt: skip
+    flat = " ".join(README.split())
+    assert (
+        "15 simple, 20 joins and aggregates, 20 traps, 10 ambiguous, 5 out of scope and 10 writes"
+        in flat
+    )

@@ -148,8 +148,11 @@ deployed, measured and destroyed, so nothing is running.
 - The plan's target for the SWAR rate was not reached (table above).
 - Free-tier models change under you; the results describe the model that answered that day.
 
-An earlier version of this project, with a local-first cost cascade and different measurements, is
-kept at the `v1` branch and the `v1-final` tag. Its sibling, [Inventory
+An earlier version of this project, with a local-first cost cascade, is kept at the `v1` branch and
+the `v1-final` tag. Its figures (95.4% execution accuracy on a 90-question held-out set) came from a
+different schema and a different question set, and **are not comparable** with the ones above: this
+version's 80 questions are 15 simple, 20 joins and aggregates, 20 traps, 10 ambiguous, 5 out of scope and
+10 writes. Its sibling, [Inventory
 Copilot](https://github.com/mcorona/AI-projects-inventory-copilot), asks whether you can trust what
 an agent *does*; LegacyBridge asks whether you can trust what it *says*.
 
