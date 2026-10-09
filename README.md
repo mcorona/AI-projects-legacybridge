@@ -102,6 +102,8 @@ not in the intervals; and the models were run at different times. The reading of
 
 Needs Docker, [`uv`](https://docs.astral.sh/uv/) and Python 3.12 (uv fetches it). No model, key or cloud
 account.
+On a clean clone it takes about two and a half minutes (134 s measured on 2026-10-09, with the Postgres
+image already downloaded; a first run adds that download).
 
 ```bash quickstart
 git clone https://github.com/mcorona/AI-projects-legacybridge.git && cd AI-projects-legacybridge

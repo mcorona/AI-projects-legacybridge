@@ -58,7 +58,9 @@ jobs:
       - name: Start the database
         run: |
           cp .env.example .env
-          docker compose up -d --wait
+          # Docker Hub times out now and then (it did once): try three times before failing
+          for attempt in 1 2 3; do docker compose up -d --wait && break || { echo "attempt $attempt failed"; sleep 15; }; done
+          docker compose ps --status running --services | grep -q legacy-db
       - name: Seed the synthetic data
         run: uv run python -m scripts.seed --seed 42
       - name: Tests (live-model tests are skipped unless LB_RUN_LLM_TESTS is 1)
@@ -83,7 +85,9 @@ jobs:
       - name: Start the database
         run: |
           cp .env.example .env
-          docker compose up -d --wait
+          # Docker Hub times out now and then (it did once): try three times before failing
+          for attempt in 1 2 3; do docker compose up -d --wait && break || { echo "attempt $attempt failed"; sleep 15; }; done
+          docker compose ps --status running --services | grep -q legacy-db
       - name: Seed the synthetic data
         run: uv run python -m scripts.seed --seed 42
       - name: Eval gate (no model - attacks, oracle on 20 fixed cases, detector baseline)
