@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "legacybridge": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "legacybridge.mcp_server"]
+    }
+  }
+}
