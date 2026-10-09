@@ -72,9 +72,10 @@ AI-projects-legacybridge/
 ├── .mcp.json                   # para usar el MCP server desde Claude Code
 ├── db/init/                    # DDL + roles que Docker carga al crear la BD
 │   ├── 01_facturacion.sql      # esquema legado estilo 2000
-│   ├── 02_roles.sh             # lb_reader / lb_writer
-│   └── 03_sicpt.sql            # pendiente: el DDL de sicpt no está disponible
-├── scripts/seed.py             # seed determinista (generador puro + carga con COPY)
+│   ├── 02_sicpt.sql            # inventario: SUSTITUTO SINTÉTICO (el DDL real de sicpt no está disponible)
+│   └── 03_roles.sh             # lb_reader / lb_writer (va después de crear las tablas)
+├── scripts/seed.py             # seed determinista de facturación (+ carga de ambos esquemas)
+├── scripts/seed_sicpt.py       # seed determinista del inventario sintético (flujo aleatorio propio)
 ├── src/legacybridge/
 │   ├── mcp_server/             # server.py, tools.py, sql_guard.py
 │   ├── semantic/               # ontology.yaml, loader.py, defect_rules.py
@@ -127,11 +128,11 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 
 - [x] Esqueleto local en `~/legacybridge-v2`: `git init`, `uv init --package --name legacybridge --python 3.12`, dependencias del plan más `python-dotenv`, ruff y pytest configurados en `pyproject.toml`. LegacyBridge v1 (`mcorona/AI-projects-legacybridge`) queda intacto.
 - [ ] 👤 Crear el repo de GitHub: nombre y visibilidad por confirmar (`AI-projects-legacybridge` ya existe como v1). `gh repo create <owner>/<nombre> --license mit`
-- [ ] 👤 Copiar `sicpt/schema/ddl_borrador.sql` y su seed desde `AI-projects-nlq-inventory` a `db/init/`. **Pendiente**: el archivo no existe en este equipo; aportar la ruta o el DDL
+- [x] `sicpt`: el DDL real (`sicpt/schema/ddl_borrador.sql`) no existe en este equipo y no lo recuerdas, así que se diseñó un **sustituto sintético** de inventario (`db/init/02_sicpt.sql`: `invart`, `invalm`, `invexi`, `invprv`, `invmov`) con su seed (`scripts/seed_sicpt.py`). No es el sicpt real: si aparece el DDL, se reemplaza
 - [x] Diseñar el esquema de facturación **estilo 2000** (`db/init/01_facturacion.sql`, en lugar de `data/facturacion/` porque es lo que Docker carga): `FACCAB` / `FACDET` / `CLIENTES` / `PRODUCTOS`, claves `CHAR` con padding, fechas `CHAR(8)` `YYYYMMDD`, importes en columnas mal tipadas, borrado lógico con `STATUS='B'`, RFC denormalizado, columna "reutilizada" con un significado distinto según el año. Sin PK, FK ni índices
 - [x] Seed sintético determinista (`uv run python -m scripts.seed --seed 42`): 5 045 cabeceras (5 000 folios más 45 recapturas) y 20 221 renglones, con 10 defectos sembrados a tasa controlada (`--dry-run` las imprime)
-- [ ] 👤 `docs/legacy-defects.md`: los 18 defectos de `sicpt` + los nuevos de facturación (ID, tabla, columna, síntoma, regla correcta). **Borrador FAC-01…FAC-10 escrito**; faltan los 18 de `sicpt` y tu validación
-- [x] `docker-compose.yml` con Postgres 16 (puerto 5434) y dos roles en `db/init/02_roles.sh`: `lb_reader` (solo SELECT, `statement_timeout` 5 s) y `lb_writer` (solo UPDATE de `clientes.status/telefono/email` y `productos.status`; sin DELETE ni DDL)
+- [ ] 👤 `docs/legacy-defects.md`: los 18 defectos de `sicpt` + los nuevos de facturación (ID, tabla, columna, síntoma, regla correcta). **Borrador escrito**: FAC-01…FAC-10 (facturación) y SIC-01…SIC-18 (inventario sintético); falta tu validación
+- [x] `docker-compose.yml` con Postgres 16 (puerto 5434) y dos roles en `db/init/03_roles.sh`: `lb_reader` (solo SELECT, `statement_timeout` 5 s) y `lb_writer` (solo UPDATE de `clientes.status/telefono/email`, `productos.status` e `invart.activo`; sin DELETE ni DDL)
 - [ ] 👤 `evals/golden_set.yaml` con **80 casos**. **Borrador completo**: 80 casos, hashes calculados, 20 trampas verificadas (`review: draft`); pendiente de tu validación (`review: approved`):
 
   | Categoría | Casos | Comportamiento esperado |
@@ -163,7 +164,7 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 **Verificación:** `make db-up && make seed && uv run pytest tests/test_data.py tests/test_golden_set.py && uv run python -m scripts.golden_hash --check`
 **DoD:** la BD se levanta desde cero en menos de 2 minutos; el golden set tiene 80 casos con `expected_result_hash` calculado automáticamente; los defectos están documentados.
 
-**Estado (2026-10-08): parcial.** Cumplido para facturación: la BD se levanta y se siembra desde cero en ~6 s, 113 tests en verde, 80 casos con hash calculado y 20 trampas verificadas. Falta: `data/sicpt` y sus 18 defectos (DDL no disponible), tu validación del golden set y de `legacy-defects.md`, y crear el repo de GitHub.
+**Estado (2026-10-08): técnicamente cumplida, pendiente de tu validación 👤.** La BD (facturación más el inventario sintético) se levanta y se siembra desde cero en ~6 s, 129 tests en verde, 80 casos con hash calculado y 20 trampas verificadas, y 28 defectos documentados (FAC-01…10, SIC-01…18). Quedan: tu validación del golden set y de `legacy-defects.md` (`review: approved`), y reemplazar el sicpt sintético por el real si aparece el DDL. El golden set cubre solo facturación; los casos de inventario quedan para cuando el esquema sea el real.
 
 ---
 
