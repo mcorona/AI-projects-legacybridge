@@ -310,7 +310,9 @@ bucket-emptying helper function creates at run time (CloudFormation does not own
 What remains, on purpose or because it cannot be removed:
 
 - **`CDKToolkit`**, the shared bootstrap stack: a 296 KB bucket, an empty image repository and roles.
-  No recurring cost worth the name. Not removed: other CDK stacks would need it.
+  No recurring cost worth the name, so it was left at first. **It was removed later** (2026-10-09, at
+  the author's request): the bucket was emptied, the stack deleted and the bucket, which CloudFormation
+  retains, deleted too. The next `make deploy` needs `make bootstrap` again.
 - **Transaction Search**, on at 1% indexing: no cost without traffic.
 - **The `LegacyBridge` custom metrics** that the per-question EMF records created in CloudWatch.
   They cannot be deleted; CloudWatch stops billing a custom metric after it has had no data for a
