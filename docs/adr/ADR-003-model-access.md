@@ -45,3 +45,19 @@ budget thinking, the free tier rate-limits, and the gateway may fail transiently
 2. **One adapter per provider from the start.** The two current providers speak the same API.
 3. **Disable the local model's reasoning to save time.** It lowers SQL quality, which is exactly
    what the project measures.
+
+## Update 2026-10-08: first live runs
+
+- `local-qwen` (Qwen3.6-35B-A3B via LM Studio) and `omniroute-free` both answered the five Phase 4
+  development scenarios live (answer, clarification, two abstentions, a queued write).
+- The OmniRoute combos `auto/best-free` and `auto/coding:free` returned HTTP 500 immediately, with
+  or without tools, although the catalogue lists `tool_calling: true`. The adapter retried four
+  times with backoff and reported the failure instead of hiding it. A single free model
+  (`openrouter/nvidia/nemotron-3-ultra-550b-a55b:free`) worked, so the profile is validated with a
+  model, not with the combo. Another listed `:free` model answered 404 ("no longer free").
+- Lesson: a gateway's catalogue is not a guarantee. Which models are free and working changes from
+  day to day, which is why `omniroute-free` results are best-effort and outside the CI gate
+  (ADR-010), and why a live check of the profile belongs in `tests/test_live.py`.
+- Local Qwen occasionally returned an empty completion right after a tool call. At temperature 0 an
+  identical retry repeats the empty answer, so the adapter now retries empty replies with a little
+  randomness (0.4) and reports the `finish_reason`, token count and reasoning size in the error.
