@@ -1,4 +1,4 @@
-.PHONY: db-up db-reset seed test lint obs-up obs-down eval eval-gate eval-report infra-test synth bootstrap deploy destroy aws-leftovers
+.PHONY: db-up db-reset seed test lint obs-up obs-down demo demo-gif eval eval-gate eval-report infra-test synth bootstrap deploy destroy aws-leftovers
 
 # Starts Postgres (creates .env from .env.example on first run) and waits until it is healthy.
 db-up:
@@ -30,6 +30,14 @@ obs-up:
 
 obs-down:
 	docker compose --profile obs stop phoenix otel-collector
+
+# The three-act demo that needs no model: a trap, attacks, a write that waits for a person.
+demo: db-up
+	uv run python -m evals.demo
+
+# Re-records docs/demo/demo.gif from docs/demo/demo.tape (needs vhs, ttyd, ffmpeg; the database up).
+demo-gif: db-up
+	vhs docs/demo/demo.tape
 
 # ---- evaluation (Phase 6, ADR-013). RUN_ID names the result files; reuse one to resume a run.
 RUN_ID ?= $(shell date -u +%Y%m%d)

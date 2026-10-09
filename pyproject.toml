@@ -53,6 +53,7 @@ select = ["E", "F", "I", "UP", "B"]
 "evals/swar_eval.py" = ["E501"]  # report text is clearer unwrapped
 "evals/report.py" = ["E501"]  # report text is clearer unwrapped
 "evals/guardrails.py" = ["E501"]  # report text is clearer unwrapped
+"evals/demo.py" = ["E501"]  # screen text is clearer unwrapped
 "scripts/cost_model.py" = ["E501"]  # document text is clearer unwrapped
 "evals/kb_eval.py" = ["E501"]  # report text is clearer unwrapped
 "infra/*" = ["E501"]  # a CloudFormation-shaped stack reads better with its properties on one line

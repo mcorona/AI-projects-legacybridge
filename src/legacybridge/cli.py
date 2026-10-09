@@ -89,7 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     ask = sub.add_parser("ask", help="ask a question about the legacy data")
     ask.add_argument("question")
-    ask.add_argument("--profile", default="local-qwen", help="local-qwen | omniroute-free")
+    ask.add_argument(
+        "--profile",
+        default="local-qwen",
+        help="a profile of config/models.yaml: local-qwen | omniroute-free | bedrock-claude | "
+        "bedrock-claude-sonnet | bedrock-claude-opus",
+    )
     ask.add_argument("--json", action="store_true", help="print the full result as JSON")
     ask.add_argument("--no-verify", action="store_true", help="skip the independent verifier")
     ask.add_argument(
