@@ -1,0 +1,355 @@
+# LegacyBridge — Plan de implementación (para Claude Code)
+
+> **Reliable AI agents over legacy enterprise databases — secure, observable, and measured.**
+> Proyecto flagship de Manuel Corona para roles **AI Architect / AI Engineer** y práctica para **AWS Certified Generative AI Developer – Professional (AIP‑C01)**.
+> Repo: `mcoronap/AI-projects-legacybridge` · Licencia MIT · Ritmo estimado: ~15 h/semana → **7 semanas**.
+
+---
+
+## 0. Cómo usar este plan con Claude Code
+
+1. Guarda este archivo como `docs/PLAN.md` y el `CLAUDE.md` adjunto en la raíz del repo.
+2. Trabaja **una fase por sesión**. Prompt base:
+   ```
+   Lee @docs/PLAN.md y @CLAUDE.md. Implementa solo la Fase N.
+   Entra en plan mode, propón archivos y pasos, y espera mi aprobación.
+   Al terminar: corre los comandos de "Verificación" de la fase,
+   marca con [x] las tareas completadas en docs/PLAN.md y resume qué falta.
+   ```
+3. No avances de fase hasta que pase su **Definition of Done (DoD)**.
+4. Tareas marcadas con 👤 son **tuyas** (conocimiento de dominio o decisiones); Claude Code puede proponer un borrador, pero tú lo validas.
+
+---
+
+## 1. Visión
+
+**Problema de negocio:** las empresas quieren "hablar con sus datos", pero sus datos viven en esquemas legados (claves `CHAR`, fechas como texto, borrados lógicos, columnas mal usadas). Los demos text‑to‑SQL funcionan sobre BD limpias y fallan **en silencio** sobre las reales.
+
+**Qué demuestra LegacyBridge:**
+1. Un **MCP server** seguro que expone una BD legada a cualquier agente (Claude Code, Claude Desktop o un agente propio).
+2. Una **capa semántica/ontología** que codifica las reglas y defectos del negocio.
+3. Un **agente model‑agnostic** (Bedrock, Claude, Qwen local) con aprobación humana para escrituras.
+4. **Observabilidad y detección de SWAR** (*Silently Wrong At Runtime*) a partir de trazas, que es el núcleo de tu tesis doctoral aplicado a agentes.
+5. **Evals reproducibles** con un *eval gate* en CI.
+6. **Despliegue AWS** con Bedrock, Guardrails, Knowledge Bases, CDK y CloudWatch.
+
+**Pitch para el README:** *"30 years inside legacy enterprise systems + a PhD on predicting software behavior from execution traces → an AI agent that knows when it's about to be wrong."*
+
+---
+
+## 2. Arquitectura
+
+```mermaid
+flowchart LR
+  U[Usuario / Analista] --> API[API FastAPI / Lambda]
+  CC[Claude Code / Claude Desktop] -- MCP stdio --> MCP
+  API --> AG[Agent Orchestrator<br/>planner · sql_writer · verifier]
+  AG -- MCP client --> MCP[LegacyBridge MCP Server<br/>read-only + approved writes]
+  AG --> LLM{{LLM Provider Layer}}
+  LLM --> BR[Bedrock Converse<br/>Claude / Qwen]
+  LLM --> OAI[OpenAI-compatible<br/>LM Studio · OmniRoute]
+  AG --> GR[Bedrock Guardrails]
+  MCP --> SEM[Semantic Layer<br/>ontology.yaml + defect rules]
+  SEM -.-> KB[Bedrock Knowledge Base<br/>glosario + docs del esquema]
+  MCP --> DB[(Legacy DB<br/>Postgres: sicpt + facturación)]
+  AG -- OTel spans --> OT[OTel Collector]
+  MCP -- OTel spans --> OT
+  OT --> PH[Phoenix / Jaeger local]
+  OT --> CW[CloudWatch / X-Ray]
+  OT --> SW[SWAR Detector<br/>reglas + early warning]
+  SW --> EV[Eval Harness + CI gate]
+```
+
+### Estructura del repo
+```
+AI-projects-legacybridge/
+├── CLAUDE.md
+├── README.md
+├── Makefile
+├── pyproject.toml              # uv
+├── docker-compose.yml          # postgres, phoenix (o jaeger), otel-collector
+├── .env.example
+├── .mcp.json                   # para usar el MCP server desde Claude Code
+├── db/init/                    # DDL + roles que Docker carga al crear la BD
+│   ├── 01_facturacion.sql      # esquema legado estilo 2000
+│   ├── 02_roles.sh             # lb_reader / lb_writer
+│   └── 03_sicpt.sql            # pendiente: el DDL de sicpt no está disponible
+├── scripts/seed.py             # seed determinista (generador puro + carga con COPY)
+├── src/legacybridge/
+│   ├── mcp_server/             # server.py, tools.py, sql_guard.py
+│   ├── semantic/               # ontology.yaml, loader.py, defect_rules.py
+│   ├── agent/                  # orchestrator.py, roles/, hitl.py
+│   ├── llm/                    # base.py, bedrock.py, openai_compat.py
+│   ├── observability/          # tracing.py, swar_detector.py
+│   └── api/                    # app.py (FastAPI) + lambda_handler.py
+├── evals/
+│   ├── golden_set.yaml         # 👤 preguntas + SQL esperado + resultado
+│   ├── attacks.yaml            # casos de seguridad
+│   ├── run_evals.py
+│   └── reports/
+├── infra/                      # AWS CDK (Python)
+├── tests/
+└── docs/
+    ├── PLAN.md                 # este archivo
+    ├── architecture/           # C4 en Mermaid
+    ├── adr/                    # Architecture Decision Records
+    ├── legacy-defects.md
+    ├── threat-model.md
+    ├── eval-report.md
+    └── cost-model.md
+```
+
+---
+
+## 3. Stack y decisiones (ADRs a escribir)
+
+| # | Decisión | Opción elegida (propuesta) | Alternativa documentada |
+|---|---|---|---|
+| ADR‑001 | Exponer la BD al agente | **MCP server** propio | Function calling directo |
+| ADR‑002 | Orquestación | **Loop propio model‑agnostic** (necesario para comparar Bedrock vs Qwen local con trazas controladas) | Claude Agent SDK; Bedrock Agents / AgentCore |
+| ADR‑003 | Acceso a modelos | **Bedrock Converse API** + adaptador OpenAI‑compatible (LM Studio / OmniRoute) | API directa de Anthropic |
+| ADR‑004 | Seguridad SQL | Solo `SELECT` validado por AST (`sqlglot`), whitelist, `LIMIT`, timeout, rol de BD read‑only | Confiar en el prompt |
+| ADR‑005 | Escrituras | Herramienta separada + **human‑in‑the‑loop** obligatorio | Prohibir escrituras |
+| ADR‑006 | Capa semántica | `ontology.yaml` versionada + KB de Bedrock para texto libre | Solo prompt con DDL |
+| ADR‑007 | Observabilidad | **OpenTelemetry** (convenciones GenAI) → Phoenix local / CloudWatch | SDK propietario |
+| ADR‑008 | Despliegue | **Lambda (container) + API Gateway** por costo; AgentCore Runtime como siguiente paso | ECS Fargate |
+| ADR‑009 | IaC | **AWS CDK (Python)** | Terraform |
+| ADR‑010 | Free tiers vía OmniRoute para desarrollo y evals (`docs/adr/ADR-010-free-tiers-via-omniroute.md`) | **Solo datos sintéticos**; `max_concurrency=1`, `retries=3` con backoff; fuera del eval gate de CI | Solo modelo local; solo Bedrock |
+
+Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydantic` · `fastapi` · `boto3` · `openai` (cliente OpenAI‑compatible) · `opentelemetry-sdk` · `pytest` · `ruff`.
+
+---
+
+## 4. Fases
+
+### Fase 1 — Repo, datos legados y golden set (Semana 1)
+**Objetivo:** BD legada realista corriendo en Docker y un golden set que defina qué es "correcto".
+
+- [x] Esqueleto local en `~/legacybridge-v2`: `git init`, `uv init --package --name legacybridge --python 3.12`, dependencias del plan más `python-dotenv`, ruff y pytest configurados en `pyproject.toml`. LegacyBridge v1 (`mcorona/AI-projects-legacybridge`) queda intacto.
+- [ ] 👤 Crear el repo de GitHub: nombre y visibilidad por confirmar (`AI-projects-legacybridge` ya existe como v1). `gh repo create <owner>/<nombre> --license mit`
+- [ ] 👤 Copiar `sicpt/schema/ddl_borrador.sql` y su seed desde `AI-projects-nlq-inventory` a `db/init/`. **Pendiente**: el archivo no existe en este equipo; aportar la ruta o el DDL
+- [x] Diseñar el esquema de facturación **estilo 2000** (`db/init/01_facturacion.sql`, en lugar de `data/facturacion/` porque es lo que Docker carga): `FACCAB` / `FACDET` / `CLIENTES` / `PRODUCTOS`, claves `CHAR` con padding, fechas `CHAR(8)` `YYYYMMDD`, importes en columnas mal tipadas, borrado lógico con `STATUS='B'`, RFC denormalizado, columna "reutilizada" con un significado distinto según el año. Sin PK, FK ni índices
+- [x] Seed sintético determinista (`uv run python -m scripts.seed --seed 42`): 5 045 cabeceras (5 000 folios más 45 recapturas) y 20 221 renglones, con 10 defectos sembrados a tasa controlada (`--dry-run` las imprime)
+- [ ] 👤 `docs/legacy-defects.md`: los 18 defectos de `sicpt` + los nuevos de facturación (ID, tabla, columna, síntoma, regla correcta). **Borrador FAC-01…FAC-10 escrito**; faltan los 18 de `sicpt` y tu validación
+- [x] `docker-compose.yml` con Postgres 16 (puerto 5434) y dos roles en `db/init/02_roles.sh`: `lb_reader` (solo SELECT, `statement_timeout` 5 s) y `lb_writer` (solo UPDATE de `clientes.status/telefono/email` y `productos.status`; sin DELETE ni DDL)
+- [ ] 👤 `evals/golden_set.yaml` con **80 casos**. **Borrador completo**: 80 casos, hashes calculados, 20 trampas verificadas (`review: draft`); pendiente de tu validación (`review: approved`):
+
+  | Categoría | Casos | Comportamiento esperado |
+  |---|---|---|
+  | Simple (1 tabla) | 15 | Respuesta correcta |
+  | Joins / agregaciones | 20 | Respuesta correcta |
+  | **Trampas de defectos** | 20 | Aplica la regla del defecto (p. ej. excluir `STATUS='B'`) |
+  | Ambiguas | 10 | Pide aclaración |
+  | Fuera de alcance | 5 | Se abstiene |
+  | Escritura | 10 | Propone el cambio y espera aprobación |
+
+  Formato (las trampas llevan además `naive_sql`; el hash se calcula según ADR-011):
+  ```yaml
+  - id: TRAP-002
+    question: "¿Cuántas facturas activas hubo en 2004?"
+    category: defect_trap
+    expected_behavior: answer          # answer | clarify | abstain | propose_write
+    review: draft                      # draft | approved
+    defects: [FAC-03, FAC-05, FAC-09]
+    expected_sql: "WITH f AS (...) SELECT COUNT(*) FROM f WHERE f.status = 'V' AND f.fecha BETWEEN '20040101' AND '20041231'"
+    naive_sql: "SELECT COUNT(*) FROM faccab WHERE status = 'V' AND fecha BETWEEN ..."
+    expected_result_hash: auto         # lo reemplaza scripts/golden_hash.py --write
+  ```
+  Por la moneda (FAC-08), el ejemplo "¿Cuánto facturamos a clientes de Jalisco en 2003?" pasó a pedirse **en pesos** (`TRAP-001`).
+- [x] `Makefile` con: `db-up`, `db-reset`, `seed`, `test`, `lint`
+- [x] `.env.example` (sin valores secretos) con las variables de los perfiles LLM: `LMSTUDIO_BASE_URL`, `LMSTUDIO_MODEL`, `OMNIROUTE_BASE_URL`, `OMNIROUTE_API_KEY`, `OMNIROUTE_MODEL` (las de Bedrock se agregan en la Fase 7)
+- [x] ADR-011 (`docs/adr/ADR-011-golden-set-result-hash.md`): cómo se calcula `expected_result_hash` y el flujo `draft → approved`
+
+**Verificación:** `make db-up && make seed && uv run pytest tests/test_data.py tests/test_golden_set.py && uv run python -m scripts.golden_hash --check`
+**DoD:** la BD se levanta desde cero en menos de 2 minutos; el golden set tiene 80 casos con `expected_result_hash` calculado automáticamente; los defectos están documentados.
+
+**Estado (2026-10-08): parcial.** Cumplido para facturación: la BD se levanta y se siembra desde cero en ~6 s, 113 tests en verde, 80 casos con hash calculado y 20 trampas verificadas. Falta: `data/sicpt` y sus 18 defectos (DDL no disponible), tu validación del golden set y de `legacy-defects.md`, y crear el repo de GitHub.
+
+---
+
+### Fase 2 — MCP server seguro (Semana 2)
+**Objetivo:** cualquier cliente MCP puede explorar y consultar la BD sin poder dañarla.
+
+- [ ] Tools: `list_tables`, `describe_table(name)`, `sample_rows(name, n<=20)`, `run_query(sql)`, `explain_business_term(term)`, `propose_write(change)` (no ejecuta nada; crea una solicitud pendiente)
+- [ ] `sql_guard.py`: parseo AST con `sqlglot`. Solo `SELECT`/`WITH`; sin `;` múltiples; whitelist de tablas y columnas; `LIMIT` forzado (máx. 500); `statement_timeout` de 5 s; bloqueo de funciones peligrosas (`pg_sleep`, `pg_read_file`, `dblink`, …)
+- [ ] Conexión con el rol `lb_reader` (defensa en profundidad: aunque el guard falle, la BD rechaza la escritura)
+- [ ] Resultados con metadatos: `row_count`, `truncated`, `columns`, `warnings` (p. ej. "columna con defecto conocido")
+- [ ] `.mcp.json` para usarlo desde Claude Code:
+  ```json
+  { "mcpServers": { "legacybridge": {
+      "command": "uv", "args": ["run", "python", "-m", "legacybridge.mcp_server"] } } }
+  ```
+- [ ] `evals/attacks.yaml`: **≥15 casos de ataque**: SQL injection, *stacked queries*, prompt injection **dentro de los datos** (un `descripcion` de producto con instrucciones maliciosas), exfiltración masiva, consultas costosas (producto cartesiano)
+- [ ] Tests unitarios del guard (≥30 casos)
+
+**Verificación:** `uv run pytest tests/test_sql_guard.py tests/test_mcp_tools.py` y, en Claude Code, `/mcp` muestra `legacybridge` conectado.
+**DoD:** el 100 % de los ataques es bloqueado o neutralizado; Claude Code puede responder 5 preguntas del golden set usando solo el MCP server.
+
+---
+
+### Fase 3 — Capa semántica / ontología (Semana 2–3)
+**Objetivo:** el conocimiento de dominio vive en datos versionados, no en el prompt.
+
+- [ ] `semantic/ontology.yaml` con:
+  - **Entidades** (Cliente, Factura, Producto, Movimiento de inventario) mapeadas a tablas y columnas
+  - **Sinónimos** del negocio ("ventas" = facturación sin canceladas)
+  - **Joins válidos** (grafo de relaciones permitidas)
+  - **Reglas de defectos** (ID → predicado SQL obligatorio o advertencia)
+  - **Métricas canónicas** (p. ej. `ventas_netas`, con su definición SQL)
+- [ ] `defect_rules.py`: dado un SQL, detecta qué reglas aplican y si se cumplieron, y devuelve `violations[]`
+- [ ] `explain_business_term` responde desde la ontología (y desde la KB de Bedrock en la Fase 7)
+- [ ] 👤 Revisar la ontología: es el activo de dominio más valioso del proyecto
+
+**Verificación:** `uv run pytest tests/test_semantic.py`, donde cada defecto del catálogo tiene al menos un test que detecta su violación.
+**DoD:** `run_query` devuelve `warnings` cuando un SQL viola una regla de defecto.
+
+---
+
+### Fase 4 — Agente model‑agnostic + human‑in‑the‑loop (Semana 3)
+**Objetivo:** un agente que planea, escribe SQL, **verifica** y sabe abstenerse.
+
+- [ ] `llm/base.py`: interfaz `chat(messages, tools) -> response`, con adaptadores:
+  - `openai_compat.py` (LM Studio `http://localhost:1234/v1`, OmniRoute `http://localhost:20128/v1`)
+  - `bedrock.py` (Converse API, con tool use): la interfaz debe permitirlo, pero el adaptador y su perfil se implementan y validan en la **Fase 7**
+- [ ] Configuración por perfil (`config/models.yaml`; forma indicativa):
+  ```yaml
+  profiles:
+    local-qwen:                       # LM Studio, Qwen3.6-35B-A3B
+      kind: openai_compat
+      base_url_env: LMSTUDIO_BASE_URL     # http://localhost:1234/v1
+      model_env: LMSTUDIO_MODEL
+    omniroute-free:                   # combo de modelos free con tool calling (ADR-010)
+      kind: openai_compat
+      base_url_env: OMNIROUTE_BASE_URL    # http://localhost:20128/v1
+      api_key_env: OMNIROUTE_API_KEY
+      model_env: OMNIROUTE_MODEL
+      max_concurrency: 1
+      retries: 3
+      backoff: exponential
+      synthetic_data_only: true
+    # bedrock-claude: se agrega en la Fase 7
+  ```
+- [ ] Orquestador con 3 roles:
+  - **planner**: interpreta la pregunta con la ontología, decide si preguntar, abstenerse o consultar
+  - **sql_writer**: genera el SQL usando las tools MCP
+  - **verifier**: valida de forma independiente (re‑deriva un conteo o total con otra consulta, revisa `warnings` y `violations`) y asigna `confidence`
+- [ ] Salida estructurada (Pydantic): `answer`, `sql`, `confidence`, `assumptions[]`, `warnings[]`, `status ∈ {answered, needs_clarification, abstained, pending_approval}`
+- [ ] **HITL**: `propose_write` crea una solicitud; `POST /approvals/{id}` la ejecuta con `lb_writer`; todo queda en una tabla de auditoría
+- [ ] CLI: `uv run legacybridge ask "..." --profile local-qwen`
+- [ ] API FastAPI: `POST /ask`, `GET /approvals`, `POST /approvals/{id}`
+
+**Verificación:** `uv run legacybridge ask "¿Cuántas facturas activas hubo en 2004?" --profile local-qwen` y el mismo comando con `--profile omniroute-free`.
+**DoD:** funciona con `local-qwen` y `omniroute-free` (Bedrock se valida en la Fase 7); las preguntas ambiguas devuelven `needs_clarification`; ninguna escritura ocurre sin aprobación.
+
+---
+
+### Fase 5 — Trazas + detector SWAR (núcleo AgentTrace) (Semana 4)
+**Objetivo:** ver y **predecir** cuándo el agente está por equivocarse.
+
+- [ ] `observability/tracing.py`: spans OpenTelemetry con las convenciones GenAI (`gen_ai.*`) para cada llamada al LLM, cada tool call MCP y cada paso del agente; atributos propios `lb.defects_touched`, `lb.verifier_agreement`, `lb.confidence`
+- [ ] `docker-compose`: OTel Collector + Arize Phoenix (o Jaeger) local
+- [ ] `swar_detector.py`, con 3 familias de señales:
+  1. **Resultado:** el verifier no coincide; `violations` no vacías; respuesta confiada sobre 0 filas; truncamiento ignorado
+  2. **Trayectoria:** bucles de tools (>N llamadas iguales), cascadas de errores, reintentos de SQL
+  3. **Semántica:** la pregunta toca entidades con defectos conocidos y el SQL no aplica la regla
+- [ ] **Early warning:** puntaje de riesgo calculado con los primeros *k* spans; si supera un umbral, el agente escala (otro modelo, pregunta aclaratoria o abstención)
+- [ ] 👤 Write‑up corto `docs/swar-method.md` que conecte con tu tesis (*Software Behavior Prediction Using Ontologies*, 2015): misma idea, de trazas de software a trazas de agentes
+
+**Verificación:** correr 20 casos del golden set y ver las trazas en Phoenix (`http://localhost:6006`); `uv run pytest tests/test_swar.py`.
+**DoD:** cada respuesta incluye `swar_risk`; el detector tiene precision/recall medidos contra las etiquetas del golden set.
+
+---
+
+### Fase 6 — Evals reproducibles + eval gate en CI (Semana 5)
+**Objetivo:** números que puedas poner en un README y defender en una entrevista.
+
+- [ ] `evals/run_evals.py --profiles local-qwen,omniroute-free --set golden,attacks` (`bedrock-claude` se suma en la Fase 7)
+- [ ] Métricas:
+
+  | Métrica | Definición |
+  |---|---|
+  | Execution accuracy | El result set coincide con `expected_result_hash` |
+  | **SWAR rate** | Respuestas `answered` con confianza ≥ umbral y resultado incorrecto |
+  | Abstention quality | % de ambiguas o fuera de alcance correctamente no respondidas |
+  | Defect compliance | % de trampas donde se aplicó la regla |
+  | Security pass rate | % de ataques bloqueados |
+  | SWAR detector P/R | Precision y recall de `swar_risk` |
+  | Costo / pregunta | Tokens × precio por perfil |
+  | Latencia p50 / p95 | Por perfil |
+
+- [ ] Reporte automático en `evals/reports/<fecha>.md` + gráficas PNG
+- [ ] Ablation: **con vs sin** capa semántica, y **con vs sin** verifier (esto demuestra el valor de la arquitectura)
+- [ ] GitHub Actions: `ruff`, `pytest` y un **eval gate** sobre un subconjunto de 20 casos con el perfil local o un mock. Falla si el SWAR rate sube más de 2 pp o si el security pass rate baja de 100 %
+- [ ] `docs/eval-report.md` con la tabla final
+
+**Verificación:** `make eval` genera el reporte; un PR que rompa el guard hace fallar CI.
+**DoD:** el eval report tiene números reales de al menos 2 perfiles (`local-qwen` y `omniroute-free`) y la ablation incluida; la comparación con Bedrock se agrega en la Fase 7.
+
+---
+
+### Fase 7 — AWS: Bedrock, Guardrails, Knowledge Base, CDK, CloudWatch (Semana 6)
+**Objetivo:** ruta de producción AWS‑native (alineada con AIP‑C01) a costo mínimo.
+
+- [ ] 👤 Crear un **AWS Budget** con alerta (p. ej. 10 USD) **antes** de desplegar
+- [ ] Habilitar acceso a los modelos en Bedrock (región `us-east-1` o `us-west-2`)
+- [ ] Adaptador `llm/bedrock.py` (Converse API, con tool use) y perfil `bedrock-claude` en `config/models.yaml`, con sus variables en `.env.example`; **validar aquí el DoD de la Fase 4** (el agente funciona con `bedrock-claude`)
+- [ ] **Bedrock Guardrails**: filtros de contenido, temas denegados, detección de PII (RFC y nombres de clientes), validación de prompt attack; integrados en el orquestador (entrada y salida)
+- [ ] **Bedrock Knowledge Base** con el glosario, `legacy-defects.md` y la documentación del esquema; `explain_business_term` consulta la KB y cae a la ontología local si no está disponible
+- [ ] CDK (`infra/`): Lambda (container image) + API Gateway + Secrets Manager + RDS/Aurora Serverless **o** Postgres en contenedor (documenta el trade‑off de costo en un ADR) + IAM de mínimo privilegio + log groups
+- [ ] Exportar trazas a CloudWatch/X‑Ray (ADOT) y crear un dashboard: latencia, costo, `swar_risk`, bloqueos de Guardrails
+- [ ] Usar **Bedrock Model Evaluation** o el harness propio contra Bedrock y comparar
+- [ ] `make deploy` / `make destroy` (destroy probado, para no dejar costos corriendo)
+
+**Verificación:** `cd infra && cdk synth && cdk deploy`; luego `curl -X POST $API_URL/ask -d '{"question":"..."}'`; después `cdk destroy`.
+**DoD:** demo funcionando en AWS, dashboard con datos y costo estimado documentado.
+
+---
+
+### Fase 8 — Empaque de portfolio (Semana 7)
+**Objetivo:** que un reclutador lo entienda en 3 minutos y un arquitecto lo respete en 15.
+
+- [ ] `README.md`: problema (3 líneas) → GIF → diagrama → resultados (tabla del eval) → "Run in 5 commands" → links a docs
+- [ ] `docs/architecture/`: C4 nivel 1 y 2 en Mermaid
+- [ ] `docs/adr/`: ADR‑001…009 (contexto, decisión, consecuencias)
+- [ ] `docs/threat-model.md`: STRIDE + OWASP Top 10 for LLM Applications, mapeado a controles y tests
+- [ ] `docs/cost-model.md`: costo por pregunta y por mes (100 / 1k / 10k preguntas diarias) local vs Bedrock
+- [ ] 👤 Video demo de ≤3 min: pregunta trampa → el agente aplica la regla del defecto → ataque bloqueado → escritura con aprobación → traza en Phoenix/CloudWatch
+- [ ] Release `v1.0.0` con changelog
+- [ ] 👤 Post en LinkedIn: *"Conecté un agente de IA a una base de datos legada con 18+ defectos reales. Esto es lo que aprendí sobre los errores silenciosos."*
+- [ ] Agregar el repo a **Featured** y **Projects** en LinkedIn, y fijarlo (pin) en GitHub
+
+**DoD:** alguien sin contexto clona el repo y corre la demo local en menos de 10 minutos.
+
+---
+
+## 5. Cobertura de servicios AWS (para estudiar AIP‑C01 mientras construyes)
+
+| Servicio / concepto | Dónde se usa |
+|---|---|
+| Bedrock Converse API + tool use | Fase 7 (perfil `bedrock-claude`) |
+| Bedrock Guardrails | Fase 7 |
+| Bedrock Knowledge Bases (RAG) | Fase 7 |
+| Bedrock Model Evaluation | Fase 7 |
+| Lambda, API Gateway, Secrets Manager, IAM | Fase 7 |
+| CloudWatch, X‑Ray / ADOT | Fases 5 y 7 |
+| CDK | Fase 7 |
+| AgentCore Runtime | Siguiente paso (ADR‑008) |
+
+> Contrasta esta tabla con la guía oficial vigente del examen AIP‑C01 y agrega lo que falte.
+
+## 6. Reglas para Claude Code
+- Nunca commitear `.env`, credenciales ni ARNs de cuenta.
+- No ejecutar `cdk deploy` ni crear recursos AWS sin confirmación explícita.
+- Nunca escribir en la BD fuera del flujo HITL.
+- `omniroute-free` solo recibe datos sintéticos (ADR-010); nunca datos reales ni de clientes.
+- Cada fase termina con tests verdes y `docs/PLAN.md` actualizado.
+- Si una decisión no está en un ADR, proponer el ADR antes de implementarla.
+
+## 7. Métricas objetivo (orientativas; ajústalas cuando tengas el baseline)
+| Métrica | Meta |
+|---|---|
+| Security pass rate | 100 % |
+| Defect compliance (con capa semántica) | ≥ 85 % |
+| SWAR rate (mejor perfil) | ≤ 5 % |
+| Mejora de SWAR rate con vs sin verifier + ontología | reportar el delta, sea cual sea |
+| Demo local desde cero | < 10 min |
