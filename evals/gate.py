@@ -22,6 +22,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -89,10 +90,23 @@ def summarize_oracle(records: list[Record], subset_ids: set[str]) -> dict[str, A
     }
 
 
+REFERENCE_SKIPPED = re.compile(r"^(\S+) oracle-expected: skipped \((.+)\)$")
+
+
 def measure(log=lambda _: None) -> dict[str, Any]:
     cases = load_golden()
-    records = asyncio.run(run_oracle(cases, log=log))
+    reference_skipped: list[str] = []
+
+    def watch(line: str) -> None:
+        # Only the reference SQL must always run. A naive query that errors is a loud failure on
+        # purpose (a CAST that raises), so those skips are expected and not collected.
+        if match := REFERENCE_SKIPPED.match(line):
+            reference_skipped.append(f"{match.group(1)} ({match.group(2)})")
+        log(line)
+
+    records = asyncio.run(run_oracle(cases, log=watch))
     out = summarize_oracle(records, {c.id for c in load_subset()})
+    out["reference_skipped"] = reference_skipped
     out["security"] = measure_security(log)
     return out
 
@@ -134,6 +148,12 @@ def evaluate(measured: dict[str, Any], baseline: dict[str, Any]) -> list[Check]:
         _fmt(refuses), "all of them",
     ))  # fmt: skip
 
+    skipped = measured.get("reference_skipped", [])
+    checks.append(Check(
+        "every reference query ran", not skipped,
+        "all ran" if not skipped else "skipped: " + ", ".join(skipped),
+        "none skipped (a timeout means the database is not ready: seed runs ANALYZE)",
+    ))  # fmt: skip
     sub, base = measured["subset"], baseline["subset"]
     checks.append(
         Check(

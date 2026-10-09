@@ -26,7 +26,7 @@ def failed(checks):
 # --------------------------------------------------------------------------- the judging logic
 def test_a_measurement_equal_to_the_baseline_passes_everything():
     checks = gate.evaluate(copy.deepcopy(BASELINE), BASELINE)
-    assert failed(checks) == [] and len(checks) >= 9
+    assert failed(checks) == [] and len(checks) >= 10
 
 
 def with_(measured, path, **changes):
@@ -35,6 +35,24 @@ def with_(measured, path, **changes):
         node = node[key]
     node.update(changes)
     return measured
+
+
+def test_a_reference_query_that_did_not_run_fails_the_gate_instead_of_shrinking_the_population():
+    """Found in CI: on a database with no planner statistics the reference SQL of TRAP-007 timed out
+    and was dropped, the gate still passed on the smaller population, and nobody noticed."""
+    m = copy.deepcopy(BASELINE)
+    m["reference_skipped"] = ["TRAP-007 (execution/timeout)"]
+    assert failed(gate.evaluate(m, BASELINE)) == ["every reference query ran"]
+    assert "TRAP-007 (execution/timeout)" in gate.render(gate.evaluate(m, BASELINE))
+    m["reference_skipped"] = []
+    assert failed(gate.evaluate(m, BASELINE)) == []
+
+
+def test_the_skip_watcher_collects_reference_skips_only():
+    assert gate.REFERENCE_SKIPPED.match("TRAP-007 oracle-expected: skipped (execution/timeout)")
+    assert not gate.REFERENCE_SKIPPED.match(
+        "TRAP-001 oracle-naive: skipped (execution/invalid_query)"
+    )
 
 
 def test_a_single_attack_getting_through_fails_the_gate():

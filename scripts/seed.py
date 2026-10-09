@@ -532,7 +532,12 @@ def main() -> None:
         with connect("admin") as conn:
             load(ds, conn)
             load_sicpt(inv, conn)
-        print(f"seed={args.seed} loaded")
+            # A freshly loaded database has no planner statistics until autovacuum gets to it, and
+            # without them some reference queries pick a plan that exceeds lb_reader's 5 s limit
+            # (found in CI, where nothing waits for autovacuum). Same data, same plans, every time.
+            conn.execute("ANALYZE")
+            conn.commit()
+        print(f"seed={args.seed} loaded and analyzed")
     _print_report(ds)
     print("sicpt rows:", {t: len(getattr(inv, t)) for t in SICPT_TABLES})
     for defect, counts in sicpt_profile(inv).items():
