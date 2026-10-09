@@ -7,7 +7,7 @@ from aws_cdk.assertions import Template
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from legacybridge_infra.stack import LegacyBridgeStack  # noqa: E402
+from legacybridge_infra.stack import LegacyBridgeStack, Settings  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -33,3 +33,18 @@ def resources(template) -> dict:
 
 def of_type(resources: dict, type_: str) -> dict:
     return {k: v for k, v in resources.items() if v["Type"] == type_}
+
+
+@pytest.fixture(scope="session")
+def traced_resources(tmp_path_factory) -> dict:
+    """The same stack with traces going to X-Ray."""
+    assets = tmp_path_factory.mktemp("assets_traced")
+    (assets / "Dockerfile").write_text("FROM scratch\n")
+    stack = LegacyBridgeStack(
+        cdk.App(),
+        "Traced",
+        repo_root=assets,
+        settings=Settings(xray_traces=True),
+        env=cdk.Environment(account="111111111111", region="us-east-1"),
+    )
+    return Template.from_stack(stack).to_json()["Resources"]

@@ -10,17 +10,21 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import threading
+import time
 from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
+from opentelemetry.sdk.trace.id_generator import IdGenerator
 
 TRACER_NAME = "legacybridge"
 DEFAULT_ENDPOINT = "http://localhost:4318"
 EXPORT_TIMEOUT_S = 2.0
+XRAY_EXPORT_TIMEOUT_S = 5.0  # a signed HTTPS call from a function is slower than a local one
 MAX_CONTENT_CHARS = 2000
 _TRUE = {"1", "true", "yes", "on", "otlp"}
 
@@ -42,6 +46,22 @@ def truncate(value: Any, limit: int = MAX_CONTENT_CHARS) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
+def trace_backend() -> str:
+    """``xray`` sends spans to the AWS X-Ray OTLP endpoint; anything else is OTLP to a Collector."""
+    return "xray" if os.environ.get("LB_TRACE_BACKEND", "").strip().lower() == "xray" else "otlp"
+
+
+class XRayIdGenerator(IdGenerator):
+    """Trace ids that X-Ray accepts: the first four bytes are the start time in epoch seconds
+    (the SDK's default is fully random, and X-Ray rejects ids whose time is not recent)."""
+
+    def generate_span_id(self) -> int:
+        return random.getrandbits(64) or 1
+
+    def generate_trace_id(self) -> int:
+        return (int(time.time()) << 96) | random.getrandbits(96)
+
+
 def get_tracer() -> trace.Tracer:
     """The agent's tracer: real once a provider is installed, a no-op before."""
     return trace.get_tracer(TRACER_NAME)
@@ -53,18 +73,33 @@ def build_provider(
     processor: SpanProcessor | None = None,
 ) -> TracerProvider:
     """A provider that exports to ``exporter``, by default OTLP/HTTP to the configured endpoint."""
-    provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
+    xray = trace_backend() == "xray"
+    provider = TracerProvider(
+        resource=Resource.create({"service.name": service_name}),
+        id_generator=XRayIdGenerator() if xray else None,
+    )
     if processor is None:
         if exporter is None:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-            base = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", DEFAULT_ENDPOINT).rstrip("/")
-            exporter = OTLPSpanExporter(endpoint=f"{base}/v1/traces", timeout=EXPORT_TIMEOUT_S)
+            if xray:
+                from legacybridge.aws.xray import signed_session, xray_endpoint
+
+                region = os.environ.get("AWS_REGION", "").strip() or "us-east-1"
+                profile = os.environ.get("AWS_PROFILE", "").strip() or None
+                exporter = OTLPSpanExporter(
+                    endpoint=xray_endpoint(region),
+                    session=signed_session(region, profile=profile),
+                    timeout=XRAY_EXPORT_TIMEOUT_S,
+                )
+            else:
+                base = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", DEFAULT_ENDPOINT).rstrip("/")
+                exporter = OTLPSpanExporter(endpoint=f"{base}/v1/traces", timeout=EXPORT_TIMEOUT_S)
         processor = BatchSpanProcessor(
             exporter,
             max_queue_size=2048,
             schedule_delay_millis=1000,
-            export_timeout_millis=int(EXPORT_TIMEOUT_S * 1000),
+            export_timeout_millis=int((XRAY_EXPORT_TIMEOUT_S if xray else EXPORT_TIMEOUT_S) * 1000),
         )
     provider.add_span_processor(processor)
     return provider

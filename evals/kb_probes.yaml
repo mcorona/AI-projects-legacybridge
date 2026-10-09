@@ -1,0 +1,97 @@
+version: 1
+note: Written before any measurement (ADR-014). A query hits when any acceptable document is among the top 3 passages.
+queries:
+- id: KB-01
+  query: ¿Qué pasa con los folios que tienen ceros a la izquierda distintos?
+  acceptable:
+  - ontology.md
+  - legacy-defects.md
+- id: KB-02
+  query: facturas de clientes que no existen porque no hay llaves foráneas
+  acceptable:
+  - ontology.md
+  - legacy-defects.md
+- id: KB-03
+  query: what does status B mean for an invoice
+  acceptable:
+  - ontology.md
+  - legacy-defects.md
+  - schema-facturacion.txt
+- id: KB-04
+  query: importes guardados como texto con signo de pesos y comas
+  acceptable:
+  - ontology.md
+  - legacy-defects.md
+- id: KB-05
+  query: fechas guardadas como CHAR(8) que a veces son basura
+  acceptable:
+  - ontology.md
+  - schema-facturacion.txt
+- id: KB-06
+  query: el RFC copiado en la factura puede ser distinto al del cliente
+  acceptable:
+  - ontology.md
+  - schema-facturacion.txt
+- id: KB-07
+  query: columna ref1 cuyo significado depende del año
+  acceptable:
+  - ontology.md
+  - schema-facturacion.txt
+- id: KB-08
+  query: dos monedas sin tipo de cambio en las facturas
+  acceptable:
+  - ontology.md
+- id: KB-09
+  query: 'folios capturados dos veces: cuál versión es la buena'
+  acceptable:
+  - ontology.md
+- id: KB-10
+  query: descripciones de producto con instrucciones dirigidas a un modelo
+  acceptable:
+  - ontology.md
+  - legacy-defects.md
+- id: KB-11
+  query: definición canónica de factura vigente
+  acceptable:
+  - ontology.md
+  - legacy-defects.md
+- id: KB-12
+  query: cómo se calcula la facturación total
+  acceptable:
+  - ontology.md
+- id: KB-13
+  query: qué es un cliente activo
+  acceptable:
+  - ontology.md
+  - legacy-defects.md
+- id: KB-14
+  query: existencias negativas en el inventario
+  acceptable:
+  - ontology.md
+  - legacy-defects.md
+- id: KB-15
+  query: almacenes que no son propios dentro de las existencias
+  acceptable:
+  - ontology.md
+- id: KB-16
+  query: códigos de unidad de medida escritos de varias formas
+  acceptable:
+  - ontology.md
+- id: KB-17
+  query: costo de los artículos almacenado como texto
+  acceptable:
+  - ontology.md
+- id: KB-18
+  query: caracteres rotos en las descripciones de artículos
+  acceptable:
+  - ontology.md
+- id: KB-19
+  query: qué columna guarda la línea de producto
+  acceptable:
+  - schema-facturacion.txt
+  - ontology.md
+- id: KB-20
+  query: qué columna tiene la fecha y hora de captura de la factura
+  acceptable:
+  - schema-facturacion.txt
+  - ontology.md

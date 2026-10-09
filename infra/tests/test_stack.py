@@ -134,7 +134,9 @@ def test_no_permission_is_a_wildcard_in_action_or_in_resource(resources):
         assert all(a not in ("*", "*:*") and not a.endswith(":*") for a in actions), actions
         # A resource of "*" is allowed only where the service has no resource-level control.
         if s["Resource"] == "*":
-            assert set(actions) <= set(), f"{actions} on every resource"
+            assert set(actions) <= set(), (
+                f"{actions} on every resource (the X-Ray case is tested apart)"
+            )
 
 
 def test_the_model_is_invoked_only_on_the_inference_profile_and_its_foundation_models(resources):
@@ -311,3 +313,24 @@ def test_a_reserved_concurrency_of_zero_means_the_account_default():
     assert Settings.from_context(Node({"reserved_concurrency": 0})).reserved_concurrency is None
     assert Settings.from_context(Node({})).reserved_concurrency == 2
     assert Settings.from_context(Node({"model_id": "m"})).model_id == "m"
+
+
+# --------------------------------------------------------------------------- traces to X-Ray (off by default)
+def test_traces_to_xray_are_off_by_default_and_cost_nothing(resources):
+    env = functions(resources)["Worker"]["Properties"]["Environment"]["Variables"]
+    assert "LB_TRACING" not in env and "LB_TRACE_BACKEND" not in env
+    assert not any(
+        a.startswith("xray:") for s in statements(resources) for a in as_list(s["Action"])
+    )
+
+
+def test_turning_xray_on_adds_one_endpoint_the_two_write_actions_and_the_switches(traced_resources):
+    endpoints = of_type(traced_resources, "AWS::EC2::VPCEndpoint")
+    assert sorted(e["Properties"].get("VpcEndpointType", "Gateway") for e in endpoints.values()) == [
+        "Gateway", "Interface", "Interface", "Interface", "Interface"]  # fmt: skip
+    env = functions(traced_resources)["Worker"]["Properties"]["Environment"]["Variables"]
+    assert (env["LB_TRACING"], env["LB_TRACE_BACKEND"]) == ("1", "xray")
+    wildcard = [s for s in statements(traced_resources) if s["Resource"] == "*"]
+    assert [sorted(as_list(s["Action"])) for s in wildcard] == [
+        ["xray:PutTelemetryRecords", "xray:PutTraceSegments"]
+    ]

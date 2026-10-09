@@ -79,6 +79,7 @@ class Settings:
     model_id: str = DEFAULT_MODEL
     reserved_concurrency: int | None = 2  # for the worker; None keeps the account default
     guardrail_tier: str = "STANDARD"
+    xray_traces: bool = False  # needs Transaction Search on in the account (ADR-014)
 
     @classmethod
     def from_context(cls, node: IConstruct) -> Settings:
@@ -91,6 +92,7 @@ class Settings:
             model_id=get("model_id", DEFAULT_MODEL),
             reserved_concurrency=None if int(reserved) <= 0 else int(reserved),
             guardrail_tier=get("guardrail_tier", "STANDARD"),
+            xray_traces=str(get("xray_traces", "false")).lower() in ("1", "true", "yes"),
         )
 
 
@@ -152,11 +154,14 @@ class LegacyBridgeStack(Stack):
                 name="isolated", subnet_type=ec2.SubnetType.PRIVATE_ISOLATED, cidr_mask=24)],
         )  # fmt: skip
         one_subnet = ec2.SubnetSelection(subnets=[self.vpc.isolated_subnets[0]])  # billed per hour
-        for name, service in {
+        services = {
             "BedrockRuntime": ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
             "BedrockAgentRuntime": ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENT_RUNTIME,
             "SecretsManager": ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-        }.items():
+        }
+        if self.settings.xray_traces:
+            services["XRay"] = ec2.InterfaceVpcEndpointAwsService.XRAY  # one more, billed per hour
+        for name, service in services.items():
             self.vpc.add_interface_endpoint(
                 f"{name}Endpoint", service=service, subnets=one_subnet, private_dns_enabled=True
             )
@@ -378,6 +383,12 @@ class LegacyBridgeStack(Stack):
                 "LB_KB_ID": self.kb.attr_knowledge_base_id,
             },
         )  # fmt: skip
+        if self.settings.xray_traces:
+            self.worker.add_environment("LB_TRACING", "1")
+            self.worker.add_environment("LB_TRACE_BACKEND", "xray")
+            # X-Ray has no resource-level control for these two actions: "*" is what it requires.
+            self.worker.add_to_role_policy(iam.PolicyStatement(
+                actions=["xray:PutTraceSegments", "xray:PutTelemetryRecords"], resources=["*"]))  # fmt: skip
         self.worker.configure_async_invoke(retry_attempts=0, max_event_age=Duration.minutes(6))
         self.jobs_table.grant(self.worker, "dynamodb:GetItem", "dynamodb:UpdateItem")
         for role in ("reader", "proposer"):

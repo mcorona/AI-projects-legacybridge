@@ -363,11 +363,50 @@ def ablation_section(run: Run, summaries: dict) -> list[str]:
     return lines + [""]
 
 
-def _verdict(c: dict[str, Any]) -> str:
-    if c["p_value"] >= 0.05:
-        return "not distinguishable at 0.05"
-    better = "reference" if c["only_reference"] > c["only_other"] else "other arm"
-    return f"distinguishable (p < 0.05); the {better} handled more cases correctly"
+def _verdict(c: dict[str, Any], alpha: float = 0.05, other: str = "other arm") -> str:
+    if c["p_value"] >= alpha:
+        return f"not distinguishable at {alpha:g}"
+    better = "reference" if c["only_reference"] > c["only_other"] else other
+    return f"distinguishable (p < {alpha:g}); the {better} handled more cases correctly"
+
+
+# Fixed in ADR-014 before the Bedrock run: the reference model first, and a significance of 0.05
+# split over the two comparisons.
+MODEL_COMPARISONS = [("bedrock-claude", "local-qwen"), ("bedrock-claude", "omniroute-free")]
+MODEL_ALPHA = 0.05 / len(MODEL_COMPARISONS)
+
+
+def model_comparison_section(run: Run) -> list[str]:
+    rows, notes = [], []
+    for reference, other in MODEL_COMPARISONS:
+        a, b = run.records(reference), run.records(other)
+        if not a or not b:
+            continue
+        c = compare_arms(a, b)
+        rows.append([f"{reference} vs {other}", str(c["paired"]), f"{c['only_reference']} / {c['only_other']}",
+                     f"{c['p_value']:.4f}", _verdict(c, MODEL_ALPHA, other)])  # fmt: skip
+        if c["reference_only_ids"]:
+            notes.append(
+                f"- Correct only with `{reference}` (vs `{other}`): {', '.join(c['reference_only_ids'])}"
+            )
+        if c["other_only_ids"]:
+            notes.append(
+                f"- Correct only with `{other}` (vs `{reference}`): {', '.join(c['other_only_ids'])}"
+            )
+    if not rows:
+        return []
+    return (
+        [
+            "Paired by case on *handled correctly* (exact McNemar on the discordant pairs). Two comparisons "
+            f"were specified in advance (ADR-014), so each is read at {MODEL_ALPHA:g}, not 0.05. These are "
+            "different models on different days: the test says whether the two sets of correct cases "
+            "differ, not why.",
+            "",
+        ]
+        + table(["Comparison", "Paired", "Only reference / only other", "p", "Reading"], rows)
+        + notes
+        + [""]
+    )
 
 
 def appendix(run: Run) -> list[str]:
@@ -397,8 +436,9 @@ READING_NOTES = [
     "primary figure and the rule-based one only a cross-check.",
     "- **What the CI gate does not measure.** The gate runs a deterministic oracle, not a model; it "
     "protects the guard, tools, labels and detector, not the quality of any model.",
-    "- **Cost.** Local and free-tier profiles cost nothing here. Real prices arrive with Bedrock in "
-    "Phase 7.",
+    "- **Cost.** Local and free-tier profiles cost nothing here. A priced profile uses the per-million-"
+    "token prices in `config/models.yaml`, copied from the provider's price list (never estimated); "
+    "tokens are what the model reported, so retries that failed before answering are not counted.",
 ]
 
 
@@ -527,6 +567,8 @@ def build(run: Run, *, charts: list[Path] | None = None, notes: list[str] | None
     lines += ["## By category", ""] + category_section(run, summaries)
     lines += ["## Defect compliance", ""] + defect_section(run, summaries)
     lines += ["## Where the profiles fail together", ""] + agreement_section(run)
+    if comparison := model_comparison_section(run):
+        lines += ["## Model comparison", ""] + comparison
     lines += ["## The SWAR detector", ""] + detector_section(run, summaries)
     lines += ["## Ablation: what the verifier and the semantic layer are worth", ""]
     lines += ablation_section(run, summaries)

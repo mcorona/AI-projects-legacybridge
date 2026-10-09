@@ -215,3 +215,29 @@ def test_the_report_says_when_charts_were_skipped(monkeypatch, tmp_path, capsys)
     monkeypatch.setattr(report, "make_charts", lambda *a, **k: [])
     assert report.main(["--run-id", "t1"]) == 0
     assert "Charts were skipped" in (tmp_path / "eval-t1.md").read_text()
+
+
+# --------------------------------------------------------------------------- the model comparison (ADR-014)
+def test_the_model_comparison_appears_only_with_bedrock_and_reads_at_the_split_significance():
+    assert "## Model comparison" not in build(run_with(good("local-qwen", "full")))
+    reference = good("bedrock-claude", "full")
+    weaker = good("local-qwen", "full", n_wrong=7)  # 7 cases only the reference got: p = 2/128
+    equal = good("omniroute-free", "full", n_wrong=2)  # 2 cases only the reference got: p = 0.5
+    text = build(run_with(reference, weaker, equal))
+    section = text.split("## Model comparison")[1].split("## ")[0]
+    assert "each is read at 0.025" in section and "different models on different days" in section
+    assert (
+        "| bedrock-claude vs local-qwen | 10 | 7 / 0 | 0.0156 | distinguishable (p < 0.025); the reference handled more cases correctly |"
+        in section
+    )
+    assert (
+        "| bedrock-claude vs omniroute-free | 10 | 2 / 0 | 0.5000 | not distinguishable at 0.025 |"
+        in section
+    )
+    assert "Correct only with `bedrock-claude` (vs `local-qwen`)" in section
+
+
+def test_a_comparison_whose_profile_was_not_run_is_left_out_not_invented():
+    text = build(run_with(good("bedrock-claude", "full"), good("local-qwen", "full", n_wrong=3)))
+    section = text.split("## Model comparison")[1].split("## ")[0]
+    assert "bedrock-claude vs local-qwen" in section and "omniroute-free" not in section
