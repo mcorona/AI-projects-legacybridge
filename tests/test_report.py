@@ -230,7 +230,7 @@ def test_the_model_comparison_appears_only_with_bedrock_and_reads_at_the_split_s
     )
     assert "different models run at different times" in section
     assert (
-        "| bedrock-claude vs local-qwen | 10 | 7 / 0 | 0.0156 | distinguishable (p < 0.025); the reference handled more cases correctly |"
+        "| bedrock-claude vs local-qwen | 10 | 7 / 0 | 0.0156 | distinguishable (p < 0.025); bedrock-claude handled more cases correctly |"
         in section
     )
     assert (
@@ -274,3 +274,18 @@ def test_each_family_splits_its_own_significance_independently():
 
     assert [comparison_alpha(pairs) for _, pairs in COMPARISON_FAMILIES] == [0.025, 0.025]
     assert comparison_alpha([("a", "b")]) == 0.05
+
+
+def test_a_model_comparison_names_the_better_model_not_a_reference():
+    """In the larger-models family the first of the pair is the larger model: calling it 'the
+    reference' read as if it were the Haiku baseline."""
+    reference = good("bedrock-claude", "full", n_wrong=9)
+    opus = good("bedrock-claude-opus", "full")  # nine more right: p = 2/512
+    text = build(run_with(reference, opus))
+    section = text.split("## Model comparison")[1].split("## ")[0]
+    assert (
+        "distinguishable (p < 0.025); bedrock-claude-opus handled more cases correctly" in section
+    )
+    assert (
+        "the reference handled" not in section and "Right only with 1st / only with 2nd" in section
+    )

@@ -165,3 +165,57 @@ def test_an_unexpected_cloudformation_error_is_not_mistaken_for_a_missing_stack(
 
     with pytest.raises(RuntimeError, match="AccessDenied"):
         aws_leftovers.stack_status(Broken(), "LegacyBridge")
+
+
+# --------------------------------------------------------------------------- stale tag listings
+class EC2WithGone(Ec2):
+    """EC2 that knows which ids still exist; asking for a deleted one raises like the real service."""
+
+    def __init__(self, alive=(), **kw):
+        super().__init__(**kw)
+        self.alive = set(alive)
+
+    def _one(self, key, ids, what):
+        if ids[0] not in self.alive:
+            raise RuntimeError(
+                f"An error occurred (Invalid{what}.NotFound): {ids[0]} does not exist"
+            )
+        return {key: [{"Id": ids[0]}]}
+
+    def describe_vpc_endpoints(self, VpcEndpointIds=None, **kw):
+        if VpcEndpointIds is None:
+            return super().describe_vpc_endpoints(**kw)
+        return self._one("VpcEndpoints", VpcEndpointIds, "VpcEndpointId")
+
+    def describe_vpcs(self, VpcIds, **kw):
+        return self._one("Vpcs", VpcIds, "VpcID")
+
+
+def test_a_deleted_network_resource_that_the_tag_index_still_lists_is_not_a_leftover():
+    tagging = Tagging([{"ResourceTagMappingList": [
+        {"ResourceARN": "arn:aws:ec2:us-east-1:1:vpc-endpoint/vpce-gone"},
+        {"ResourceARN": "arn:aws:ec2:us-east-1:1:vpc/vpc-alive"},
+    ]}])  # fmt: skip
+    found = aws_leftovers.find(
+        clients(tagging=[tagging.pages[0]], ec2=EC2WithGone(alive=["vpc-alive"]))
+    )
+    assert found == {"tagged resources": ["arn:aws:ec2:us-east-1:1:vpc/vpc-alive"]}
+
+
+def test_a_listed_resource_of_a_kind_that_cannot_be_checked_stays_reported():
+    arn = "arn:aws:rds:us-east-1:1:db:legacybridge-db"
+    assert aws_leftovers.still_exists(EC2WithGone(), arn) is True
+    found = aws_leftovers.find(
+        clients(tagging=[{"ResourceTagMappingList": [{"ResourceARN": arn}]}])
+    )
+    assert found == {"tagged resources": [arn]}
+
+
+def test_an_unexpected_ec2_error_keeps_the_resource_listed_instead_of_hiding_it():
+    class Broken(Ec2):
+        def describe_vpc_endpoints(self, **kw):
+            raise RuntimeError("UnauthorizedOperation")
+
+    assert (
+        aws_leftovers.still_exists(Broken(), "arn:aws:ec2:us-east-1:1:vpc-endpoint/vpce-1") is True
+    )

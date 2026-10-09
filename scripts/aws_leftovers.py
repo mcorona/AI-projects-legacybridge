@@ -33,6 +33,32 @@ def tagged_arns(tagging: Any) -> list[str]:
             return arns
 
 
+# EC2 kinds that the tagging API may keep listing for a while after they are deleted (it is
+# eventually consistent), and the call that asks EC2 directly. Anything else is reported as listed.
+EC2_CHECKS = {
+    "vpc-endpoint": ("describe_vpc_endpoints", "VpcEndpointIds"),
+    "vpc": ("describe_vpcs", "VpcIds"),
+    "subnet": ("describe_subnets", "SubnetIds"),
+    "security-group": ("describe_security_groups", "GroupIds"),
+    "route-table": ("describe_route_tables", "RouteTableIds"),
+}
+
+
+def still_exists(ec2: Any, arn: str) -> bool:
+    """False only when EC2 itself says the resource is gone; True for anything else, including an
+    ARN of a kind that cannot be checked here (a stale listing must not hide a real leftover)."""
+    kind, _, resource_id = arn.rpartition(":")[2].partition("/")
+    check = EC2_CHECKS.get(kind)
+    if ":ec2:" not in arn or check is None:
+        return True
+    method, parameter = check
+    try:
+        found = getattr(ec2, method)(**{parameter: [resource_id]})
+    except Exception as error:  # EC2 answers a deleted id with an InvalidXxx.NotFound error
+        return "NotFound" not in str(error)
+    return any(found.values())
+
+
 def stack_status(cloudformation: Any, name: str) -> str | None:
     try:
         stacks = cloudformation.describe_stacks(StackName=name)["Stacks"]
@@ -47,9 +73,9 @@ def find(clients: dict[str, Any]) -> dict[str, list[str]]:
     leftovers: dict[str, list[str]] = {}
     if status := stack_status(clients["cloudformation"], STACK):
         leftovers["stack"] = [f"{STACK}: {status}"]
-    if arns := tagged_arns(clients["tagging"]):
-        leftovers["tagged resources"] = arns
     ec2 = clients["ec2"]
+    if arns := [a for a in tagged_arns(clients["tagging"]) if still_exists(ec2, a)]:
+        leftovers["tagged resources"] = arns
     nat = [
         n["NatGatewayId"]
         for n in ec2.describe_nat_gateways(

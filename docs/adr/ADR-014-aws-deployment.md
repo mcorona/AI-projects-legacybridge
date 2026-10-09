@@ -189,3 +189,83 @@ here before either model has answered one case:**
   models are equal.
 - **Not done:** no prompt, label or tolerance changes for these models. The monthly budget of 40 USD
   may send its alert with these runs; it is an alert, not a cap, and the credits cover the cost.
+
+### 2026-10-09, after the first deploy: what it taught, and what was measured
+
+The stack deployed at the first attempt (627 s) and was destroyed in the same session. Three things
+that the offline checks could not show:
+
+1. **The Guardrail's cross-region profile needs its own permissions.** The first question was
+   refused with `AccessDenied` from `ApplyGuardrail`, and the agent **closed** (no model call, an
+   explicit `guardrail_error`), as designed. The IAM simulator showed the guardrail ARN allowed and the
+   profile ARN denied. Allowing the profile only in the caller's region was still not enough; AWS
+   requires the action on the guardrail, on the profile in the source region and on the profile in
+   each destination region (`us-east-2`, `us-west-2` for `us.guardrail.v1:0`). Four ARNs, no wildcard.
+2. **RDS refuses the synthetic marker.** `ALTER DATABASE ... SET lb.synthetic` and the fallback
+   `ALTER ROLE lb_reader ...` are both denied to the RDS master user (not a superuser), so the
+   deployed database carries **no** `lb.synthetic` marker (`synthetic_marker: none`). The worker does
+   not need it (`bedrock-claude` is not `synthetic_data_only`), and the check fails safe: a profile
+   that demands synthetic data would refuse to start against this database. It is synthetic by
+   construction (seed 42), but the database cannot say so.
+3. **A guardrail error is not an intervention.** The first dashboard image counted two failed calls
+   as interventions. `GuardrailErrors` is now its own metric and series.
+
+Measured on the deployed stack, as preregistered:
+
+- **API:** 401 without or with a wrong token, 422 on an invalid body, 404 on an unknown route, 200 on
+  `/health`; a question returns 202 and is polled to `done` in 5 to 22 s. A cold container in the VPC
+  adds about 13 s. A prompt-injection question is blocked in the guardrail (`PROMPT_ATTACK`,
+  `MISCONDUCT`, `TOPIC:credenciales`) without calling a model; a question whose answer holds an
+  individual's RFC comes back with `{RFC_FISICA}` and **no evidence rows**, and the real RFC appears
+  nowhere in the response.
+- **Guardrail probes** (`evals/reports/guardrails-20261009.md`, not tuned on): the 18 attacks it
+  should stop were all blocked (18/18, CI 0.82-1.00; one to three per category, so no category is
+  separately defensible); the 8 attacks that other layers contain were blocked 3/8, as expected for
+  a layer that is not the main defense; output PII was masked correctly on 4/4 and 0/4 clean outputs
+  were touched. Of the 80 golden questions, **2 were blocked**: OOS-003 asks for the system
+  passwords, an out-of-scope case the agent must refuse anyway, so blocking it is right even though
+  the rule written beforehand counts it as a false positive; **WRITE-008** (deactivate all inactive
+  clients of one state) is a legitimate write request, a real false positive. 15 of 130 delivered
+  answers would be masked (e-mail 6, phone 9) and 3 answers (TRAP-019, in all three profiles) were
+  blocked on output because they repeat the instruction text found in the data. The probes were
+  written by the same person who wrote the guardrail's policy: a clean result on them is weaker
+  evidence than the same result on probes from someone else.
+- **Knowledge base** (`evals/reports/kb-20261009.md`): hit@3 20/20, but **every one of the 20 queries
+  accepts `ontology.md`**, the largest document, so a retriever that ignored the query would also
+  score 20/20. The probe shows that the knowledge base is reachable, indexed (3 documents, none
+  failed) and returns relevant text; it cannot show that it adds anything the ontology lacks, and the
+  report prints that baseline next to the hit rate. A probe that discriminates would need queries
+  whose only right answer is a passage the ontology does not contain.
+- **Dashboard:** the per-question EMF record reaches CloudWatch (latency, tokens, cost, `swar_risk`,
+  guardrail interventions, blocks and errors, by status); images of the widgets with real data are in
+  `docs/aws/`.
+- **Not done:** traces to X-Ray. The account's trace destination is `XRay`, not CloudWatch Logs
+  (Transaction Search is off), and turning it on is an account-level change that was not made. The
+  code (SigV4 signing, X-Ray trace ids, the switch and its endpoint) is tested offline and
+  `xray_traces` stays off; whether it works from the VPC is **not known**. The traces of the
+  deployment are in the logs and the metrics, not in X-Ray.
+- **Cost of the stack**, from the Price List published 2026-10-06: RDS `db.t4g.micro` Single-AZ
+  PostgreSQL 0.016 USD an hour, gp3 storage 0.115 USD per GB-month (20 GB), 0.01 USD an hour per
+  interface endpoint (three here), plus secrets and logs: about **0.05 USD an hour deployed**, less
+  than the 0.07 estimated above (which counted a fourth endpoint for X-Ray that is off). It existed
+  for under an hour.
+- **A process note.** The Sonnet 4.6 run shares the local database with the test suite, and a full
+  test run overlapped its write cases. Its write labels all read their request from the queue and match;
+  the gaps in the request ids are the ones the tests consumed. Nothing anomalous was found, but a run
+  and a test suite should not share a database, and the later runs were not overlapped.
+- **Destroying took 27 minutes, not 5.** Deleting a Lambda that is in a VPC waits for its network
+  interfaces to be released, and CloudFormation cannot delete the database, the subnets or the
+  security groups until then; the database kept running (0.016 USD an hour) meanwhile. Nothing failed
+  and nothing had to be forced. `aws_leftovers` then reported four VPC endpoints that no longer
+  existed: the tagging API is eventually consistent and kept listing them. The script now asks EC2
+  directly about the network resources the index lists and drops the ones EC2 says are gone, and keeps
+  anything it cannot check (a stale listing must not hide a real leftover). After that, and with direct
+  counts of RDS instances, endpoints, VPCs, guardrails, knowledge bases and secrets all at zero, nothing
+  of the project was left except the shared CDK bootstrap stack, which was **not** removed.
+- **Bedrock runs, as ADR-014 extended them** (the numbers are in `docs/eval-report.md`): Haiku 4.5
+  2.09 USD, Sonnet 4.6 6.08 USD and Opus 4.6 10.39 USD for the 80 cases, 18.56 in all (the estimate
+  for Haiku was 2.7). Haiku against `local-qwen` is distinguishable at 0.025 (14 cases against 3,
+  p = 0.013) and against `omniroute-free` is not; Opus against Haiku is (15 against 2, p = 0.0023) and
+  Sonnet against Haiku is not (13 against 4, p = 0.049, above the 0.025 fixed for that family). The
+  larger models mostly answer questions that Haiku declined; they do not clearly err less.
+

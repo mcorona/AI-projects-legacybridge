@@ -363,11 +363,18 @@ def ablation_section(run: Run, summaries: dict) -> list[str]:
     return lines + [""]
 
 
-def _verdict(c: dict[str, Any], alpha: float = 0.05, other: str = "other arm") -> str:
+def _verdict(
+    c: dict[str, Any],
+    alpha: float = 0.05,
+    other: str = "the other arm",
+    reference: str = "the reference",
+) -> str:
+    """``reference`` and ``other`` are the names to print: a model comparison names both models,
+    because there the first of the pair is not a reference in any sense but order."""
     if c["p_value"] >= alpha:
         return f"not distinguishable at {alpha:g}"
-    better = "reference" if c["only_reference"] > c["only_other"] else other
-    return f"distinguishable (p < {alpha:g}); the {better} handled more cases correctly"
+    better = reference if c["only_reference"] > c["only_other"] else other
+    return f"distinguishable (p < {alpha:g}); {better} handled more cases correctly"
 
 
 # Fixed in ADR-014 before the Bedrock runs. Each family is read at 0.05 split over its own comparisons:
@@ -394,7 +401,7 @@ def model_comparison_section(run: Run) -> list[str]:
                 continue
             c = compare_arms(a, b)
             rows.append([f"{reference} vs {other}", str(c["paired"]), f"{c['only_reference']} / {c['only_other']}",
-                         f"{c['p_value']:.4f}", _verdict(c, alpha, other)])  # fmt: skip
+                         f"{c['p_value']:.4f}", _verdict(c, alpha, other, reference)])  # fmt: skip
             if c["reference_only_ids"]:
                 notes.append(
                     f"- Correct only with `{reference}` (vs `{other}`): {', '.join(c['reference_only_ids'])}"
@@ -413,7 +420,10 @@ def model_comparison_section(run: Run) -> list[str]:
                 "sets of correct cases differ, not why.",
                 "",
             ]
-            + table(["Comparison", "Paired", "Only reference / only other", "p", "Reading"], rows)
+            + table(
+                ["Comparison", "Paired", "Right only with 1st / only with 2nd", "p", "Reading"],
+                rows,
+            )
             + notes
             + [""]
         )
