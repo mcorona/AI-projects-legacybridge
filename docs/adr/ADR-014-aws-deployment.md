@@ -269,3 +269,32 @@ Measured on the deployed stack, as preregistered:
   Sonnet against Haiku is not (13 against 4, p = 0.049, above the 0.025 fixed for that family). The
   larger models mostly answer questions that Haiku declined; they do not clearly err less.
 
+### 2026-10-09, later: Transaction Search turned on and X-Ray traces verified
+
+The traces spike above had no answer; it has one now. At the user's request Transaction Search was
+enabled with the four documented steps, in order: a CloudWatch Logs resource policy
+(`TransactionSearchXRayAccess`, scoped to the X-Ray service, the account, and the two log groups
+`aws/spans` and `/aws/application-signals/data`), `update-trace-segment-destination CloudWatchLogs`
+(about 13 minutes from `PENDING` to `ACTIVE`), and the indexing rule at 1%. The stack was deployed
+again with `-c xray_traces=true` (a fourth interface endpoint and the two X-Ray write actions), a
+question was asked, and the stack was destroyed.
+
+- **It works from the VPC.** The worker's SigV4-signed OTLP export reached CloudWatch Logs through the
+  new endpoint: one question produced **one trace of 29 spans** with an X-Ray trace id (the first four
+  bytes are the start time), the agent spans (`invoke_agent` for planner, sql_writer and verifier,
+  `chat <model>` with token counts, `execute_tool`), the MCP server's `tools/call` spans nested under
+  their tool, and the `lb.*` attributes (status, confidence, `swar_risk`, verifier agreement,
+  guardrail action) on the root. The tree is in `docs/aws/xray-trace.md`. The question and the answer
+  are not in it: content capture stays off. That settles the question the spike left open.
+- **What X-Ray's own API shows.** `BatchGetTraces` and `GetTraceSummaries` returned nothing for it: with
+  Transaction Search X-Ray indexes only the configured percentage (1%) as trace summaries, and the
+  full spans live in the `aws/spans` log group, which is what was read. Seeing every trace needs
+  CloudWatch (Transaction Search, Logs Insights), not the X-Ray trace API.
+- **The cost of leaving it on.** Transaction Search was **left enabled** at 1% indexing. It costs
+  nothing without traffic; with traffic, ingested spans are billed at CloudWatch Logs rates and the
+  1% indexing is free (AWS lists a separate free tier for new use; not relied on here). The `aws/spans`
+  log group, created by the service, keeps its data 30 days. It is one
+  command to put back: `aws xray update-trace-segment-destination --destination XRay`.
+- **Latency.** The first question after a cold start took 34 s (against 18 s warm on the earlier
+  deployment), with the extra endpoint and a cold container in the VPC.
+
