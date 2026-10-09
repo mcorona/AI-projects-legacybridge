@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -27,6 +27,7 @@ class QueryRun:
     truncated: bool
     warnings: list[str]
     violations: list[dict[str, Any]]
+    defects_touched: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -42,7 +43,8 @@ class LoopResult:
     queries: list[QueryRun] = field(default_factory=list)
     calls: list[ToolRecord] = field(default_factory=list)
     text: str = ""
-    reason: str = "no_finish"  # finished | finished_by_tool | max_steps | no_finish | llm_error
+    # finished | finished_by_tool | max_steps | no_finish | llm_error | early_warning
+    reason: str = "no_finish"
     error: LLMError | None = None  # the model failed; what the tools already did is kept
 
 
@@ -71,21 +73,26 @@ async def run_tool_loop(
     max_steps: int,
     rows_to_model: int,
     stop_after_ok: frozenset[str] = frozenset(),
+    watch: Callable[[], bool] | None = None,
 ) -> LoopResult:
-    """Run tools until the model calls ``finish``. A tool in ``stop_after_ok`` ends the loop as soon
-    as it succeeds: its result is the whole outcome, so no further model call is needed."""
+    """Run tools until the model calls ``finish``.
+
+    A tool in ``stop_after_ok`` ends the loop as soon as it succeeds: its result is the whole
+    outcome, so no further model call is needed. ``watch`` is asked after every tool result;
+    returning True stops the loop (the early warning, ADR-012)."""
     messages = [Message.system(system), Message.user(user)]
     allowed = {t.name for t in tools}
     out = LoopResult()
     nudged = False
     for _ in range(max_steps):
-        try:
-            response = await llm.chat(messages, [*tools, finish])
-        except LLMError as error:
-            rec.llm_error(role, error)  # a failed call is part of the trace too
-            out.error, out.reason = error, "llm_error"
-            return out  # keep what the tools already did; the caller decides what that means
-        rec.llm(role, response)
+        with rec.llm_call(role, llm, messages) as call:
+            try:
+                response = await llm.chat(messages, [*tools, finish])
+            except LLMError as error:
+                call.fail(error)  # a failed call is part of the trace too
+                out.error, out.reason = error, "llm_error"
+                return out  # keep what the tools already did; the caller decides what that means
+            call.ok(response)
         out.text = response.text or out.text
         if not response.tool_calls:
             if nudged:
@@ -117,11 +124,9 @@ async def run_tool_loop(
                     )
                 )
                 continue
-            started = time.perf_counter()
-            result = await backend.call(call.name, call.arguments)
-            ms = round((time.perf_counter() - started) * 1000, 1)
-            ok = result.get("ok") is True
-            rec.tool(role, call.name, ok, ms, "" if ok else str(result.get("reason", "")))
+            with rec.tool_call(role, call.name, call.arguments) as tool:
+                result = await backend.call(call.name, call.arguments)
+                ok = tool.finish(result)
             out.calls.append(ToolRecord(call.name, call.arguments, result))
             query_id = None
             if call.name == "run_query" and ok:
@@ -136,11 +141,15 @@ async def run_tool_loop(
                         truncated=result["truncated"],
                         warnings=result.get("warnings", []),
                         violations=result.get("violations", []),
+                        defects_touched=result.get("defects_touched", []),
                     )  # fmt: skip
                 )
             messages.append(Message.tool(call, compact(result, rows_to_model, query_id)))
             if ok and call.name in stop_after_ok:
                 out.reason = "finished_by_tool"
+                return out
+            if watch is not None and watch():
+                out.reason = "early_warning"
                 return out
     out.reason = "max_steps"
     return out

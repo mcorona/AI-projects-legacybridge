@@ -61,12 +61,13 @@ async def run_planner(
     messages = [Message.system(system), Message.user(question)]
     last_error: Exception | None = None
     for _ in range(2):  # one retry with a reminder, then give up
-        try:
-            response = await llm.chat(messages)
-        except LLMError as error:
-            rec.llm_error("planner", error)
-            raise
-        rec.llm("planner", response)
+        with rec.llm_call("planner", llm, messages) as call:
+            try:
+                response = await llm.chat(messages)
+            except LLMError as error:
+                call.fail(error)
+                raise
+            call.ok(response)
         try:
             decision = PlannerDecision.model_validate(extract_json(response.text))
         except (InvalidModelOutput, ValidationError) as error:

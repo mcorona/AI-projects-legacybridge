@@ -18,6 +18,8 @@ class Evidence(BaseModel):
     rows: list[list[Any]]  # at most 20
     row_count: int
     truncated: bool
+    violations: list[dict[str, Any]] = Field(default_factory=list)  # rule engine, structured
+    defects_touched: list[str] = Field(default_factory=list)
 
 
 class Usage(BaseModel):
@@ -40,6 +42,28 @@ class Event(BaseModel):
     output_tokens: int = 0
     detail: str = ""
     retries: list[str] = Field(default_factory=list)
+    attempt: int = 0  # writer attempt (0 = first); a retry after the verifier disagreed is 1
+    args_hash: str = ""  # tool events: short hash of the arguments, to spot identical repeats
+    stage: str = ""  # tool events that failed: guard | execution | connection | ...
+    sql: str = ""  # run_query events: the SQL that was sent, truncated
+    escalated: bool = False  # recorded during the rerun on the escalation profile
+
+
+class VerdictRecord(BaseModel):
+    """One verifier verdict. A run can have several (a writer retry gets verified again)."""
+
+    attempt: int = 0
+    agrees: bool
+    confidence: float
+    issues: list[str] = Field(default_factory=list)
+    checks_run: int = 0
+
+
+class SwarSignal(BaseModel):
+    name: str
+    family: Literal["result", "trajectory", "semantics"]
+    weight: float
+    detail: str = ""
 
 
 class AgentResult(BaseModel):
@@ -58,6 +82,15 @@ class AgentResult(BaseModel):
     verified: bool = False
     usage: Usage = Field(default_factory=Usage)
     events: list[Event] = Field(default_factory=list)
+    verdicts: list[VerdictRecord] = Field(default_factory=list)
+    # SWAR (ADR-012): risk of this answer being silently wrong, and why
+    swar_risk: float = 0.0
+    swar_level: Literal["low", "elevated", "high"] = "low"
+    swar_signals: list[SwarSignal] = Field(default_factory=list)
+    defects_touched: list[str] = Field(default_factory=list)
+    early_warning: str | None = None  # checkpoint that acted: C1 | C2
+    escalated_from: str | None = None  # profile of the first run, when it was rerun elsewhere
+    trace_id: str | None = None  # OpenTelemetry trace id, when tracing is on
 
 
 class AgentConfig(BaseModel):
@@ -67,3 +100,4 @@ class AgentConfig(BaseModel):
     max_retries: int = 1  # writer retries after the verifier disagrees
     rows_to_model: int = 30  # rows of a result shown to a model
     evidence_rows: int = 20  # rows kept in the result
+    swar_action: Literal["gate", "annotate", "off"] = "gate"  # ADR-012
