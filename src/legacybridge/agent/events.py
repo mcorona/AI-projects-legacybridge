@@ -277,6 +277,12 @@ class Recorder:
             span.set_attribute(A.LB_REQUEST_ID, result.request_id)
         if result.verdicts:
             span.set_attribute(A.LB_VERIFIER_AGREEMENT, result.verdicts[-1].agrees)
+        if result.guardrail is not None:
+            span.set_attribute(A.LB_GUARDRAIL_ACTION, result.guardrail.action or "none")
+            span.set_attribute(
+                A.LB_GUARDRAIL_FINDINGS,
+                result.guardrail.input_findings + result.guardrail.output_findings,
+            )
         if result.evidence is not None:
             span.set_attribute(A.LB_ROW_COUNT, result.evidence.row_count)
             span.set_attribute(A.LB_TRUNCATED, result.evidence.truncated)

@@ -66,6 +66,14 @@ class SwarSignal(BaseModel):
     detail: str = ""
 
 
+class GuardrailRecord(BaseModel):
+    """What the text guardrails did to this question (ADR-014); absent when none is configured."""
+
+    input_findings: list[str] = Field(default_factory=list)
+    output_findings: list[str] = Field(default_factory=list)
+    action: Literal["blocked_input", "blocked_output", "masked", "error"] | None = None
+
+
 class AgentResult(BaseModel):
     status: Status
     question: str
@@ -91,6 +99,7 @@ class AgentResult(BaseModel):
     early_warning: str | None = None  # checkpoint that acted: C1 | C2
     escalated_from: str | None = None  # profile of the first run, when it was rerun elsewhere
     trace_id: str | None = None  # OpenTelemetry trace id, when tracing is on
+    guardrail: GuardrailRecord | None = None  # set only when a guard is configured
 
 
 class AgentConfig(BaseModel):

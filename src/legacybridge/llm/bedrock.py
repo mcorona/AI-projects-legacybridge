@@ -44,18 +44,25 @@ CONNECT_TIMEOUT_S = 10
 EMPTY_TEXT = "(empty)"  # Converse rejects empty text blocks
 
 
-def make_client(profile: Profile) -> Any:
-    """The ``bedrock-runtime`` client for a profile: a named AWS profile on a laptop, the default
-    credential chain (the function's role) in Lambda."""
-    session = boto3.Session(profile_name=profile.aws_profile, region_name=profile.region)
+def make_runtime_client(
+    region: str | None, aws_profile: str | None, *, timeout_s: float = 60, max_attempts: int = 1
+) -> Any:
+    """A ``bedrock-runtime`` client: a named AWS profile on a laptop, the default credential chain
+    (the function's role) in Lambda. ``max_attempts=1`` leaves the retries to the caller."""
+    session = boto3.Session(profile_name=aws_profile, region_name=region)
     return session.client(
         "bedrock-runtime",
         config=Config(
-            retries={"total_max_attempts": 1},  # the retries are ours, so they are visible
-            read_timeout=profile.timeout_s,
+            retries={"total_max_attempts": max_attempts},
+            read_timeout=timeout_s,
             connect_timeout=CONNECT_TIMEOUT_S,
         ),
     )
+
+
+def make_client(profile: Profile) -> Any:
+    """The client for a chat profile; its retries are ours, so they are visible."""
+    return make_runtime_client(profile.region, profile.aws_profile, timeout_s=profile.timeout_s)
 
 
 # ============================================================================ message conversion

@@ -17,6 +17,7 @@ from legacybridge.agent.digest import digest, years_covered
 from legacybridge.agent.early_warning import EarlyWarning, Escalation, RiskMonitor
 from legacybridge.agent.events import Recorder
 from legacybridge.agent.evidence import calibrate, numbers_not_in_evidence
+from legacybridge.agent.guards import TextGuard, guess_language
 from legacybridge.agent.loop import QueryRun
 from legacybridge.agent.roles.planner import PlannerDecision, run_planner
 from legacybridge.agent.roles.sql_writer import WriterOutcome, run_writer
@@ -26,7 +27,13 @@ from legacybridge.agent.roles.verifier import (
     describe_request,
     run_verifier,
 )
-from legacybridge.agent.schemas import AgentConfig, AgentResult, Evidence, VerdictRecord
+from legacybridge.agent.schemas import (
+    AgentConfig,
+    AgentResult,
+    Evidence,
+    GuardrailRecord,
+    VerdictRecord,
+)
 from legacybridge.llm.base import InvalidModelOutput, LLMClient, LLMError, ToolSpec
 from legacybridge.observability.swar_config import load_swar_config
 from legacybridge.observability.swar_detector import RunFacts, assess, facts_from_result
@@ -83,6 +90,14 @@ MESSAGES = {
         "es": "No pude completar esta consulta de forma fiable: {why}",
         "en": "I could not complete this request reliably: {why}",
     },
+    "guardrail_blocked": {
+        "es": "Esta solicitud fue bloqueada por la política de seguridad (Guardrails): {why}",
+        "en": "This request was blocked by the safety policy (Guardrails): {why}",
+    },
+    "guardrail_error": {
+        "es": "No pude aplicar la política de seguridad (Guardrails), así que no continúo: {why}",
+        "en": "I could not apply the safety policy (Guardrails), so I am not continuing: {why}",
+    },
     "clarify_period": {
         "es": "¿De qué periodo quieres esta cifra? Los datos cubren de {first} a {last}.",
         "en": "For which period do you want this figure? The data covers {first} to {last}.",
@@ -118,8 +133,10 @@ class Agent:
         *,
         escalation_llm: LLMClient | None = None,
         tracer: Tracer | None = None,
+        guard: TextGuard | None = None,
     ):
         self.llm, self.backend = llm, backend
+        self.guard = guard  # None = no text guardrails (the default)
         self.config = config or AgentConfig()
         self.ontology = ontology or load_ontology()
         if not self.config.semantic:
@@ -135,13 +152,107 @@ class Agent:
         question = question.strip()
         rec = Recorder(tracer=self.tracer)
         with rec.run(question, getattr(self.llm, "name", "")):
-            try:
-                result = await self._run(question, rec)
-            except Escalation as escalation:
-                result = await self._escalate(question, rec, escalation.warning)
+            to_model, result = await self._guard_input(question)
+            if result is None:
+                try:
+                    result = await self._run(to_model, rec)
+                except Escalation as escalation:
+                    result = await self._escalate(to_model, rec, escalation.warning)
+                result.question = question
             self._finish(result, rec)
+            await self._guard_output(result)
             rec.annotate_run(result)
         return result
+
+    # ------------------------------------------------------------------ text guardrails (ADR-014)
+    async def _guard_input(self, question: str) -> tuple[str, AgentResult | None]:
+        """The question to give the model, or a refusal when the guard blocks it (or cannot run:
+        a safety layer that is down fails closed)."""
+        if self.guard is None:
+            return question, None
+        try:
+            verdict = await self.guard.check_input(question)
+        except Exception as error:  # the guard's own failure, whatever the provider raised
+            return question, self._refusal(question, "error", str(error)[:200], [])
+        if verdict.action == "blocked":
+            return question, self._refusal(
+                question,
+                "blocked_input",
+                ", ".join(verdict.findings) or "policy",
+                list(verdict.findings),
+            )
+        return (verdict.text or question) if verdict.action == "masked" else question, None
+
+    def _refusal(self, question: str, kind: str, why: str, findings: list[str]) -> AgentResult:
+        language = guess_language(question)
+        reason = {"error": "guardrail_error", "blocked_input": "guardrail_input"}[kind]
+        key = "guardrail_error" if kind == "error" else "guardrail_blocked"
+        return AgentResult(
+            status="abstained", question=question, abstain_reason=reason,
+            answer=say(key, language, why=why),
+            guardrail=GuardrailRecord(input_findings=findings, action=kind),  # type: ignore[arg-type]
+        )  # fmt: skip
+
+    async def _guard_output(self, result: AgentResult) -> None:
+        """Check what leaves: the answer, the warnings and the assumptions. Masking keeps the
+        answer but withholds the evidence rows (they carry the raw values); a block replaces the
+        answer; a guard that fails closes the answer."""
+        if self.guard is None:
+            return
+        record = result.guardrail or GuardrailRecord()
+        if record.action in ("blocked_input", "error"):
+            return  # the refusal is our own text
+        result.guardrail = record
+        texts = [result.answer, *result.warnings, *result.assumptions]
+        try:
+            verdicts = [await self.guard.check_output(t) if t.strip() else None for t in texts]
+        except Exception as error:
+            record.action = "error"
+            self._close(
+                result,
+                say("guardrail_error", guess_language(result.question), why=str(error)[:200]),
+                "guardrail_error",
+            )
+            return
+        found = [v for v in verdicts if v is not None and v.intervened]
+        record.output_findings = sorted({f for v in found for f in v.findings})
+        if not found:
+            return
+        if any(v.action == "blocked" for v in found):
+            record.action = "blocked_output"
+            why = ", ".join(record.output_findings) or "policy"
+            self._close(
+                result,
+                say("guardrail_blocked", guess_language(result.question), why=why),
+                "guardrail_output",
+            )
+            return
+        record.action = "masked"
+        masked = [
+            (v.text if v is not None and v.intervened else t)
+            for v, t in zip(verdicts, texts, strict=True)
+        ]
+        result.answer = masked[0]
+        n = len(result.warnings)
+        result.warnings = masked[1 : 1 + n]
+        result.assumptions = masked[1 + n :]
+        self._withhold(result)
+        result.warnings.append(
+            "Part of the answer was masked by the output guardrail "
+            f"({', '.join(record.output_findings)}); the evidence rows are withheld."
+        )
+
+    @staticmethod
+    def _withhold(result: AgentResult) -> None:
+        if result.evidence is not None:
+            result.evidence = result.evidence.model_copy(update={"rows": []})
+        result.preview = []
+
+    def _close(self, result: AgentResult, answer: str, reason: str) -> None:
+        """Turn a result into a refusal: nothing from the run that the guard could not clear."""
+        result.status, result.abstain_reason, result.answer = "abstained", reason, answer
+        result.confidence, result.sql, result.evidence = 0.0, None, None
+        result.preview, result.warnings, result.assumptions = [], [], []
 
     async def _run(self, question: str, rec: Recorder) -> AgentResult:
         """Plan and route one question on this agent's model."""

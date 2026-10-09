@@ -7,10 +7,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from legacybridge.agent.backends import McpToolBackend
+from legacybridge.agent.guards import TextGuard
 from legacybridge.agent.orchestrator import Agent
 from legacybridge.agent.schemas import AgentConfig
 from legacybridge.llm.base import LLMClient
 from legacybridge.llm.bedrock import BedrockConverseClient
+from legacybridge.llm.bedrock_guardrails import guard_from_env
 from legacybridge.llm.openai_compat import OpenAICompatClient
 from legacybridge.llm.profiles import assert_data_allowed, load_profile
 from legacybridge.mcp_server.tools import LegacyTools
@@ -36,6 +38,7 @@ async def open_agent(
     llm: LLMClient | None = None,
     escalation_profile: str | None = None,
     escalation_llm: LLMClient | None = None,
+    guard: TextGuard | None = None,
 ) -> AsyncIterator[Agent]:
     client = llm or build_llm(profile)
     name = escalation_profile or os.environ.get("LB_ESCALATION_PROFILE", "").strip() or None
@@ -50,4 +53,6 @@ async def open_agent(
             None if semantic else LegacyTools(ontology=empty_ontology())
         )
     async with tools as opened:
-        yield Agent(client, opened, config=config, escalation_llm=second)
+        yield Agent(
+            client, opened, config=config, escalation_llm=second, guard=guard or guard_from_env()
+        )

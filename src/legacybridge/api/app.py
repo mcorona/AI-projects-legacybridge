@@ -25,6 +25,7 @@ from legacybridge.agent.orchestrator import Agent
 from legacybridge.agent.schemas import AgentConfig, AgentResult
 from legacybridge.env import load_env
 from legacybridge.llm.base import LLMError
+from legacybridge.llm.bedrock_guardrails import guard_from_env
 from legacybridge.llm.profiles import ProfileError
 from legacybridge.observability.tracing import setup_tracing, shutdown_tracing
 
@@ -62,12 +63,15 @@ def create_app(
             return
         # One MCP server for the life of the API, and one model client per profile.
         clients: dict[str, Any] = {}
+        guard = guard_from_env()  # None unless LB_GUARDRAIL_ID is set
         async with McpToolBackend.stdio() as backend:
 
             async def run(question: str, profile: str, verify: bool) -> AgentResult:
                 if profile not in clients:
                     clients[profile] = await anyio.to_thread.run_sync(build_llm, profile)
-                agent = Agent(clients[profile], backend, config=AgentConfig(verify=verify))
+                agent = Agent(
+                    clients[profile], backend, config=AgentConfig(verify=verify), guard=guard
+                )
                 return await agent.ask(question)
 
             state["run"] = run
