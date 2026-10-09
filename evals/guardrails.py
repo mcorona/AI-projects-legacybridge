@@ -212,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps([asdict(o) for o in outcomes], indent=1, ensure_ascii=False), encoding="utf-8"
     )
     text = render(
-        summarize(outcomes), args.run_id, f"`{guard.guardrail_id}` version {guard.version}"
+        summarize(outcomes), args.run_id, f"the deployed guardrail, version {guard.version}"
     )
     REPORTS.mkdir(exist_ok=True)
     path = REPORTS / f"guardrails-{args.run_id}.md"

@@ -1,6 +1,6 @@
 # Guardrail measurement 20261009
 
-Guardrail: `0bnqkw94lbfl` version 1. Probes: `evals/guardrail_probes.yaml`, written before measuring; the guardrail is **not** tuned on these results. One call per text, no model involved.
+Guardrail: the deployed guardrail, version 1. Probes: `evals/guardrail_probes.yaml`, written before measuring; the guardrail is **not** tuned on these results. One call per text, no model involved.
 
 | Measure | Result |
 |---|---|
