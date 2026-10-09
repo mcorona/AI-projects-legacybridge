@@ -335,17 +335,22 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 **Objetivo:** ruta de producción AWS‑native (alineada con AIP‑C01) a costo mínimo.
 
 - [ ] 👤 Crear un **AWS Budget** con alerta (p. ej. 10 USD) **antes** de desplegar
-- [ ] Habilitar acceso a los modelos en Bedrock (región `us-east-1` o `us-west-2`)
-- [ ] Adaptador `llm/bedrock.py` (Converse API, con tool use) y perfil `bedrock-claude` en `config/models.yaml`, con sus variables en `.env.example`; **validar aquí el DoD de la Fase 4** (el agente funciona con `bedrock-claude`)
-- [ ] **Bedrock Guardrails**: filtros de contenido, temas denegados, detección de PII (RFC y nombres de clientes), validación de prompt attack; integrados en el orquestador (entrada y salida)
-- [ ] **Bedrock Knowledge Base** con el glosario, `legacy-defects.md` y la documentación del esquema; `explain_business_term` consulta la KB y cae a la ontología local si no está disponible
-- [ ] CDK (`infra/`): Lambda (container image) + API Gateway + Secrets Manager + RDS/Aurora Serverless **o** Postgres en contenedor (documenta el trade‑off de costo en un ADR) + IAM de mínimo privilegio + log groups
-- [ ] Exportar trazas a CloudWatch/X‑Ray (ADOT) y crear un dashboard: latencia, costo, `swar_risk`, bloqueos de Guardrails
+- [ ] Habilitar acceso a los modelos en Bedrock (región `us-east-1` o `us-west-2`): se verifica con lecturas tras `aws login`
+- [~] Adaptador `llm/bedrock.py` (Converse API, con tool use) y perfil `bedrock-claude` *(código y 24 pruebas con dobles; falta validarlo en vivo)* en `config/models.yaml`, con sus variables en `.env.example`; **validar aquí el DoD de la Fase 4** (el agente funciona con `bedrock-claude`)
+- [~] **Bedrock Guardrails** *(integrado en el agente, apagado por defecto, definido en CDK; falta medirlo en vivo)*: filtros de contenido, temas denegados, detección de PII (RFC y nombres de clientes), validación de prompt attack; integrados en el orquestador (entrada y salida)
+- [~] **Bedrock Knowledge Base** *(código y CDK sobre S3 Vectors; la ontología sigue primero, ver ADR-014; falta desplegar y medir)* con el glosario, `legacy-defects.md` y la documentación del esquema; `explain_business_term` consulta la KB y cae a la ontología local si no está disponible
+- [~] CDK (`infra/`) *(escrito, 36 aserciones sobre la plantilla sin credenciales, imagen construida y el front probado en el emulador de Lambda; falta desplegar)*: Lambda (container image) + API Gateway + Secrets Manager + RDS/Aurora Serverless **o** Postgres en contenedor (documenta el trade‑off de costo en un ADR) + IAM de mínimo privilegio + log groups
+- [~] Exportar trazas a CloudWatch/X‑Ray (ADOT) *(dashboard sobre EMF listo; las trazas a X-Ray por OTLP firmado son un spike opcional que solo se prueba al desplegar)* y crear un dashboard: latencia, costo, `swar_risk`, bloqueos de Guardrails
 - [ ] Usar **Bedrock Model Evaluation** o el harness propio contra Bedrock y comparar
-- [ ] `make deploy` / `make destroy` (destroy probado, para no dejar costos corriendo)
+- [~] `make deploy` / `make destroy` *(existen junto con `aws-leftovers`; destroy sin probar todavía)*
 
 **Verificación:** `cd infra && cdk synth && cdk deploy`; luego `curl -X POST $API_URL/ask -d '{"question":"..."}'`; después `cdk destroy`.
 **DoD:** demo funcionando en AWS, dashboard con datos y costo estimado documentado.
+
+**Estado (2026-10-09): bloque sin AWS terminado; el resto espera tu confirmación.** 834 tests en verde, CI en verde (ahora con un job de infraestructura). Hecho y verificado **sin tocar AWS**: adaptador Bedrock Converse con tool use, Guardrails y KB opcionales, front asíncrono (sin VPC) y worker, inicializador de la BD de RDS (probado contra un Postgres de prueba: mismos datos que la BD local), pila CDK, imagen de Lambda, sondas de Guardrails (26 ataques, 8 salidas, las 80 preguntas del golden como tráfico legítimo) y de la KB (20 consultas), y el **ADR-014 con el preregistro**, commiteado antes de cualquier corrida paga.
+- **Desviaciones del texto de este PLAN, decididas y documentadas en el ADR-014:** el API es asíncrono con dos funciones (API Gateway corta a los 30 s); `explain_business_term` consulta primero la ontología y usa la KB solo para términos que la ontología no conoce (un pasaje de texto no debe desplazar una definición canónica); se usa el harness propio y no Bedrock Model Evaluation (un juez LLM no comprueba ejecución).
+- **Lo que solo se sabe al desplegar:** que los endpoints bastan para la Lambda en VPC, S3 Vectors con la KB, el nivel STANDARD del Guardrail y las trazas a X-Ray. Si las trazas no funcionan, el dashboard queda en EMF y las trazas en Phoenix, y se dirá aquí.
+- **Pendiente tuyo 👤 (compuertas):** G0 `! aws login --profile aif` y el AWS Budget; G1 `cdk bootstrap`; G2 la corrida de Bedrock (≈ 2,7 USD estimados) y las sondas; G3 `cdk deploy` y `cdk destroy`. Nada de eso se hace sin tu «sí».
 
 ---
 
