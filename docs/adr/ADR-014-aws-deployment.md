@@ -158,4 +158,34 @@ sections where they were rejected.
 
 ## Changes after the specification
 
-None yet.
+### 2026-10-09, before any of the runs below: attacks are not rerun, and two larger models are added
+
+The Haiku 4.5 run was started with `--set golden`. The 45 attacks exercise the tools and the SQL
+guard, not a model, so their result does not depend on the profile and run id `20261009` already
+holds it (45 of 45); running them again would only overwrite an identical file. Section 1 said
+"the 80 golden cases and the 45 attacks": the attacks are the ones already measured.
+
+The user asked for larger models to be used as well, accepting the cost. **Extension, preregistered
+here before either model has answered one case:**
+
+- **Models:** Claude Sonnet 4.6 (`us.anthropic.claude-sonnet-4-6`, profile `bedrock-claude-sonnet`) and
+  Claude Opus 4.6 (`us.anthropic.claude-opus-4-6-v1`, profile `bedrock-claude-opus`): the most recent
+  model of each family that the account can use. Everything newer in the price list (4.7, 4.8, 5, 5.5,
+  Fable, Haiku 5.5) has an agreement that is `NOT_AVAILABLE` for this account (read with
+  `get-foundation-model-availability` on 2026-10-09); none of them was invoked. A smoke test of a
+  tool-use round trip with each of the two chosen models passed before this entry.
+- **Run:** `full` arm, the 80 golden cases, same labels and tolerances, one run each, **after** the
+  Haiku run finishes and never at the same time (two runs would share the write-request queue and the
+  data fingerprint of the local database). Same run id, so the report shows five profiles.
+- **Prices** from the AWS Price List published 2026-10-08T23:56:37Z, Regional (the `us.` profile is
+  geographic): Sonnet 4.6 3.30 and 16.50, Opus 4.6 5.50 and 27.50 USD per million tokens. The
+  estimate is about 8 and 13 USD for 80 cases; the real figure replaces it.
+- **Statistics:** a second family of two paired comparisons on *handled correctly*, each read at
+  **0.025**: `bedrock-claude-sonnet` vs `bedrock-claude` and `bedrock-claude-opus` vs `bedrock-claude`.
+  It is a separate family from the first two comparisons, so it does not change their significance.
+  These models are *larger*: a difference says that spending more changes which cases are right, and
+  a non-difference says that this golden set, as it is, cannot tell them apart, which is what the
+  Phase 6 finding about the draft reference and the validity rule would predict. It does not say the
+  models are equal.
+- **Not done:** no prompt, label or tolerance changes for these models. The monthly budget of 40 USD
+  may send its alert with these runs; it is an alert, not a cap, and the credits cover the cost.

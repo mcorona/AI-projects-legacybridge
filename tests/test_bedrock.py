@@ -248,6 +248,18 @@ def test_the_bedrock_profile_reads_model_region_and_credentials_profile_from_the
     assert (p.price_in_per_mtok, p.price_out_per_mtok) == (1.10, 5.50)
 
 
+@pytest.mark.parametrize("name,env,model,prices", [
+    ("bedrock-claude-sonnet", "BEDROCK_SONNET_MODEL", "us.anthropic.claude-sonnet-4-6", (3.30, 16.50)),
+    ("bedrock-claude-opus", "BEDROCK_OPUS_MODEL", "us.anthropic.claude-opus-4-6-v1", (5.50, 27.50)),
+])  # fmt: skip
+def test_the_larger_models_are_profiles_with_their_own_variable_and_price(name, env, model, prices):
+    p = load_profile(name, env={env: model, "AWS_PROFILE": "demo"})
+    assert (p.kind, p.model, p.aws_profile) == ("bedrock_converse", model, "demo")
+    assert (p.price_in_per_mtok, p.price_out_per_mtok) == prices
+    with pytest.raises(ProfileError, match=env):
+        load_profile(name, env={})
+
+
 def test_without_a_region_or_profile_the_defaults_are_the_documented_ones():
     p = load_profile("bedrock-claude", env={"BEDROCK_CHAT_MODEL": MODEL})
     assert (p.region, p.aws_profile) == ("us-east-1", None), (

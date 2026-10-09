@@ -370,43 +370,54 @@ def _verdict(c: dict[str, Any], alpha: float = 0.05, other: str = "other arm") -
     return f"distinguishable (p < {alpha:g}); the {better} handled more cases correctly"
 
 
-# Fixed in ADR-014 before the Bedrock run: the reference model first, and a significance of 0.05
-# split over the two comparisons.
-MODEL_COMPARISONS = [("bedrock-claude", "local-qwen"), ("bedrock-claude", "omniroute-free")]
-MODEL_ALPHA = 0.05 / len(MODEL_COMPARISONS)
+# Fixed in ADR-014 before the Bedrock runs. Each family is read at 0.05 split over its own comparisons:
+# the first compares the reference model with the two earlier profiles, the second (an extension
+# preregistered before the larger models ran) compares the larger models with that reference.
+COMPARISON_FAMILIES = [
+    ("Models", [("bedrock-claude", "local-qwen"), ("bedrock-claude", "omniroute-free")]),
+    ("Larger Claude models", [("bedrock-claude-sonnet", "bedrock-claude"), ("bedrock-claude-opus", "bedrock-claude")]),
+]  # fmt: skip
+
+
+def comparison_alpha(pairs: list[tuple[str, str]]) -> float:
+    return 0.05 / len(pairs)
 
 
 def model_comparison_section(run: Run) -> list[str]:
-    rows, notes = [], []
-    for reference, other in MODEL_COMPARISONS:
-        a, b = run.records(reference), run.records(other)
-        if not a or not b:
+    out: list[str] = []
+    for family, pairs in COMPARISON_FAMILIES:
+        alpha = comparison_alpha(pairs)
+        rows, notes = [], []
+        for reference, other in pairs:
+            a, b = run.records(reference), run.records(other)
+            if not a or not b:
+                continue
+            c = compare_arms(a, b)
+            rows.append([f"{reference} vs {other}", str(c["paired"]), f"{c['only_reference']} / {c['only_other']}",
+                         f"{c['p_value']:.4f}", _verdict(c, alpha, other)])  # fmt: skip
+            if c["reference_only_ids"]:
+                notes.append(
+                    f"- Correct only with `{reference}` (vs `{other}`): {', '.join(c['reference_only_ids'])}"
+                )
+            if c["other_only_ids"]:
+                notes.append(
+                    f"- Correct only with `{other}` (vs `{reference}`): {', '.join(c['other_only_ids'])}"
+                )
+        if not rows:
             continue
-        c = compare_arms(a, b)
-        rows.append([f"{reference} vs {other}", str(c["paired"]), f"{c['only_reference']} / {c['only_other']}",
-                     f"{c['p_value']:.4f}", _verdict(c, MODEL_ALPHA, other)])  # fmt: skip
-        if c["reference_only_ids"]:
-            notes.append(
-                f"- Correct only with `{reference}` (vs `{other}`): {', '.join(c['reference_only_ids'])}"
-            )
-        if c["other_only_ids"]:
-            notes.append(
-                f"- Correct only with `{other}` (vs `{reference}`): {', '.join(c['other_only_ids'])}"
-            )
-    if not rows:
-        return []
-    return (
-        [
-            "Paired by case on *handled correctly* (exact McNemar on the discordant pairs). Two comparisons "
-            f"were specified in advance (ADR-014), so each is read at {MODEL_ALPHA:g}, not 0.05. These are "
-            "different models on different days: the test says whether the two sets of correct cases "
-            "differ, not why.",
-            "",
-        ]
-        + table(["Comparison", "Paired", "Only reference / only other", "p", "Reading"], rows)
-        + notes
-        + [""]
-    )
+        out += (
+            [
+                f"**{family}.** Paired by case on *handled correctly* (exact McNemar on the discordant pairs). "
+                f"{len(pairs)} comparisons were specified in advance (ADR-014), so each is read at {alpha:g}, "
+                "not 0.05. These are different models run at different times: the test says whether the two "
+                "sets of correct cases differ, not why.",
+                "",
+            ]
+            + table(["Comparison", "Paired", "Only reference / only other", "p", "Reading"], rows)
+            + notes
+            + [""]
+        )
+    return out
 
 
 def appendix(run: Run) -> list[str]:

@@ -225,7 +225,10 @@ def test_the_model_comparison_appears_only_with_bedrock_and_reads_at_the_split_s
     equal = good("omniroute-free", "full", n_wrong=2)  # 2 cases only the reference got: p = 0.5
     text = build(run_with(reference, weaker, equal))
     section = text.split("## Model comparison")[1].split("## ")[0]
-    assert "each is read at 0.025" in section and "different models on different days" in section
+    assert (
+        "2 comparisons were specified in advance" in section and "each is read at 0.025" in section
+    )
+    assert "different models run at different times" in section
     assert (
         "| bedrock-claude vs local-qwen | 10 | 7 / 0 | 0.0156 | distinguishable (p < 0.025); the reference handled more cases correctly |"
         in section
@@ -241,3 +244,33 @@ def test_a_comparison_whose_profile_was_not_run_is_left_out_not_invented():
     text = build(run_with(good("bedrock-claude", "full"), good("local-qwen", "full", n_wrong=3)))
     section = text.split("## Model comparison")[1].split("## ")[0]
     assert "bedrock-claude vs local-qwen" in section and "omniroute-free" not in section
+
+
+def test_the_larger_models_form_their_own_family_read_against_the_reference_model():
+    reference = good("bedrock-claude", "full", n_wrong=6)  # the larger model gets 6 more right
+    sonnet = good("bedrock-claude-sonnet", "full")
+    opus = good("bedrock-claude-opus", "full", n_wrong=5)  # one more right than the reference
+    text = build(run_with(reference, sonnet, opus))
+    section = text.split("## Model comparison")[1].split("## ")[0]
+    assert "**Larger Claude models.**" in section and "**Models.**" not in section, (
+        "no earlier profile ran"
+    )
+    assert (
+        "| bedrock-claude-sonnet vs bedrock-claude | 10 | 6 / 0 | 0.0312 | distinguishable (p < 0.025)"
+        not in section
+    ), "0.0312 is above 0.025"
+    assert (
+        "| bedrock-claude-sonnet vs bedrock-claude | 10 | 6 / 0 | 0.0312 | not distinguishable at 0.025 |"
+        in section
+    )
+    assert (
+        "| bedrock-claude-opus vs bedrock-claude | 10 | 1 / 0 | 1.0000 | not distinguishable at 0.025 |"
+        in section
+    )
+
+
+def test_each_family_splits_its_own_significance_independently():
+    from evals.report import COMPARISON_FAMILIES, comparison_alpha
+
+    assert [comparison_alpha(pairs) for _, pairs in COMPARISON_FAMILIES] == [0.025, 0.025]
+    assert comparison_alpha([("a", "b")]) == 0.05

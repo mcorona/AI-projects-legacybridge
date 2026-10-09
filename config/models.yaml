@@ -44,3 +44,34 @@ profiles:
     # (the us. inference profile is geographic; Global would be 1.00 / 5.00). Never estimated.
     price_in_per_mtok: 1.10
     price_out_per_mtok: 5.50
+  bedrock-claude-sonnet:       # ceiling comparison, ADR-014 extension: Claude Sonnet 4.6
+    kind: bedrock_converse
+    model_env: BEDROCK_SONNET_MODEL      # us.anthropic.claude-sonnet-4-6
+    region_env: AWS_REGION
+    default_region: us-east-1
+    aws_profile_env: AWS_PROFILE
+    max_tokens: 4096
+    temperature: 0
+    timeout_s: 180
+    max_concurrency: 2
+    retries: 4
+    backoff_base_s: 1
+    # AWS Price List (published 2026-10-08T23:56:37Z, read 2026-10-09), Regional: 3.30 / 16.50.
+    price_in_per_mtok: 3.30
+    price_out_per_mtok: 16.50
+  bedrock-claude-opus:         # ceiling comparison, ADR-014 extension: Claude Opus 4.6
+    kind: bedrock_converse
+    model_env: BEDROCK_OPUS_MODEL        # us.anthropic.claude-opus-4-6-v1
+    region_env: AWS_REGION
+    default_region: us-east-1
+    aws_profile_env: AWS_PROFILE
+    max_tokens: 4096
+    temperature: 0
+    timeout_s: 240
+    max_concurrency: 2
+    retries: 4
+    backoff_base_s: 1
+    # AWS Price List (published 2026-10-08T23:56:37Z, read 2026-10-09), Regional: 5.50 / 27.50.
+    price_in_per_mtok: 5.50
+    price_out_per_mtok: 27.50
+
