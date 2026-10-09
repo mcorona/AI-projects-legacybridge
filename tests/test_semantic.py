@@ -83,6 +83,17 @@ def test_a_lookup_by_key_needs_no_status_filter():
     assert hits("SELECT descripcion FROM productos WHERE linea = 'PL'", "FAC-03")
 
 
+def test_a_key_lookup_through_a_normalised_key_still_needs_no_status_filter():
+    """Looking an invoice line up by folio *requires* LPAD/TRIM (FAC-01); that must not be
+    punished by FAC-03."""
+    normalised = (
+        "SELECT obs FROM facdet WHERE serie = 'B ' AND "
+        "LPAD(TRIM(numfac), 10, '0') = '0000000115' AND renglon = 2"
+    )
+    assert not hits(normalised, "FAC-03") and not hits(normalised, "FAC-01")
+    assert hits("SELECT obs FROM facdet WHERE serie = 'B '", "FAC-03"), "a scan is still a scan"
+
+
 def test_a_dimension_joined_only_to_label_needs_no_status_filter():
     sql = (
         "SELECT p.linea, SUM(d.cantidad) FROM facdet d JOIN productos p ON p.clave = d.producto "

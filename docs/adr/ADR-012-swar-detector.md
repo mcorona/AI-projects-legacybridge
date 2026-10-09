@@ -26,7 +26,9 @@ in three families:
 | Trajectory | Identical tool calls repeated; a cascade of failing tool calls; repeated rejected SQL; a writer retry; model retries or empty completions; the step limit |
 | Semantics | A term in the question whose known defects are *violated* in the SQL; a *parameter left unstated* (the question touches a metric that needs a year, names none, and the assumptions do not either) |
 
-**Combination:** `risk = 1 - prod(1 - w_i)` over fired signals (noisy-OR), with each family capped.
+**Combination:** `risk = 1 - prod(1 - w_i)` over fired signals (noisy-OR). The signals derived from the static defect rules form a **group with a cap of 0.6**,
+below the action threshold: the rules are heuristic (8 of 35 neutral golden cases draw a warning),
+so a lone heuristic can raise the level but never make the agent act.
 
 **The weights are priors, written down in `config/swar.yaml`, and are not fitted to the golden
 set.** Fitting them to the cases we then report on would flatter the detector. Precision and recall
@@ -75,3 +77,33 @@ are reported at several thresholds, not at the best one.
 2. **Use the calibrated confidence as the score.** Circular with the Phase 6 SWAR rate.
 3. **An LLM judge for risk.** Non-deterministic and costs a call per question; the signals are free.
 4. **Only annotate.** Safe, but the plan asks for an agent that acts on the warning.
+
+## Changes after the first baseline (2026-10-09)
+
+The deterministic baseline (`python -m evals.swar_eval baseline`: the real agent running the
+reference and the naive SQL of every golden answer case, no LLM, verifier agreeing) exposed three
+**definition errors**. None is a change of weights or thresholds; all three were wrong on their face
+and were fixed with a test:
+
+1. `unstated_parameter` fired on count questions ("how many units have been sold") that have a
+   legitimate all-time reading. Count questions are now exempt; "how much" still fires.
+2. A finding about the data (instructions in a cell, FAC-10) counted as `unresolved_violations`,
+   whose message says "the final query still breaks FAC-10". Data-rule findings are excluded.
+3. The rule engine did not recognise a key lookup through a normalised key
+   (`LPAD(TRIM(numfac), 10, '0') = '...'`), so the correct fix for FAC-01 raised FAC-03.
+
+Static signals only, population of 68 delivered answers (13 silently wrong), threshold 0.3 or 0.5:
+
+| | flagged | precision | recall |
+|---|---|---|---|
+| before | 24 | 0.50 (12/24) | 0.92 (12/13) |
+| after | 20 | 0.60 (12/20) | 0.92 (12/13) |
+
+At the action threshold (0.7) three answers were flagged before (1 right, 2 wrong); **none is
+after**, which is the design: rule signals alone never act. The remaining 8 false alarms are the
+known neutral-case noise of the rules (`EXPECTED_NOISE` in `tests/test_semantic.py`). One silently
+wrong answer (TRAP-009) raises no rule signal at all: the rules are blind to it by construction.
+
+These fixes were motivated by golden cases, which is why the 20-case subset was fixed and committed
+before the baseline ran, and why none of the cases that exposed them (JOIN-001, TRAP-007, TRAP-020)
+belongs to it, except TRAP-019, whose behaviour follows from fix 2 and not from its label.

@@ -164,6 +164,8 @@ def test_a_defect_the_question_touches_and_the_sql_violates():
         ("¿Cuánto vendimos en total?", "Son 829.", [], False),
         ("Ventas por año", "Son 829.", [], False),
         ("¿Cuántos clientes hay?", "Son 829.", [], False),
+        ("¿Cuántas unidades se han vendido por línea?", "Son 829.", [], False),
+        ("How many units were sold?", "829.", [], False),
     ],
 )
 def test_a_period_the_question_needed_and_nobody_stated(question, answer, assumptions, fires):
@@ -222,6 +224,21 @@ def test_signals_only_fire_once_they_can_be_known():
     writer = names(f, "writer")
     assert "unresolved_violations" in writer and "unverified" not in writer
     assert "unverified" in names(f, "final")
+
+
+def test_a_finding_about_the_data_is_not_the_query_breaking_a_rule():
+    """Hostile text in a cell (FAC-10) is reported by the data rule; it must not read as an
+    unresolved violation of the SQL, or a correct answer that quotes the text looks wrong."""
+    data = {"defect": "FAC-10", "severity": "warning", "rule": "injection_text"}
+    found = names(
+        facts(
+            question="¿Qué dice la descripción del producto P0000092?",
+            evidence=evidence(violations=[data]),
+        )
+    )
+    assert not {"unresolved_violations", "question_defect_violated"} & found
+    sql_rule = {"defect": "FAC-09", "severity": "warning", "rule": "dedupe_required"}
+    assert "unresolved_violations" in names(facts(evidence=evidence(violations=[sql_rule, data])))
 
 
 def test_the_dominant_family_is_the_heaviest_signal():

@@ -290,13 +290,15 @@ class Analysis:
         return False
 
     def is_key_lookup(self, table: str) -> bool:
-        keys = self.ontology.key_columns(table)
-        for o in self.occ:
-            if o.base and o.base[0] == table and o.base[1] in keys and self.in_predicate(o.col):
-                parent = o.col.parent
-                if isinstance(parent, exp.EQ) and lit(
-                    parent.expression if parent.this is o.col else parent.this
-                ):
+        """An equality of a key column to a literal, also when the column is normalised first.
+
+        The correct way to look up an invoice line by folio (FAC-01) is
+        ``LPAD(TRIM(numfac), 10, '0') = '...'``; treating that as "not a key lookup" would make the
+        fix for one defect raise another.
+        """
+        for key in self.ontology.key_columns(table):
+            for p in self.preds_on(f"{table}.{key}", pure=True):
+                if isinstance(p.node, exp.EQ) and (lit(p.node.expression) or lit(p.node.this)):
                     return True
         return False
 

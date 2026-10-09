@@ -27,6 +27,7 @@ from legacybridge.agent.evidence import numbers_not_in_evidence
 from legacybridge.agent.loop import QueryRun
 from legacybridge.agent.schemas import AgentResult, Event, Evidence, SwarSignal, VerdictRecord
 from legacybridge.observability.swar_config import PHASES, SwarConfig, load_swar_config
+from legacybridge.semantic.defect_rules import DATA_CHECKS
 from legacybridge.semantic.loader import Ontology
 
 Phase = Literal["trajectory", "writer", "final"]
@@ -36,6 +37,12 @@ WHOLE_PERIOD = re.compile(
     r"en total|hist[oó]ric|acumulad|todos los a[ñn]os|desde siempre|desde el inicio|por a[ñn]o|"
     r"por mes|all[- ]time|overall|in total|every year|each year|per year|per month",
     re.IGNORECASE,
+)
+# "How many" has a legitimate all-time reading ("how many units have been sold"); "how much" does
+# not for a sales amount. Found by the first baseline: without this a count question drew a
+# clarification it did not need.
+COUNT_QUESTION = re.compile(
+    r"\bcu[aá]nt[oa]s\b|how many|\bunidades\b|\bunits\b|\bpiezas\b|n[uú]mero de", re.IGNORECASE
 )
 ACKNOWLEDGES_TRUNCATION = re.compile(
     r"trunc|parcial|partial|primer[oa]s?\s+\d|first\s+\d|solo\s+\d|only\s+\d|"
@@ -137,7 +144,13 @@ def _result(facts: RunFacts, c: _Collector) -> None:
     ev, status = facts.evidence, facts.status
     answering = status in (None, "answered")
     if ev is not None:
-        warnings = [v for v in ev.violations if v.get("severity") == "warning"]
+        # Findings about the *data* (instructions or mojibake in a cell) are not the SQL breaking a
+        # defect rule: they have their own handling and must not read as "the query is wrong".
+        warnings = [
+            v
+            for v in ev.violations
+            if v.get("severity") == "warning" and v.get("rule") not in DATA_CHECKS
+        ]
         if warnings:
             ids = sorted({v.get("defect", "?") for v in warnings})
             c.fire("unresolved_violations", "the final query still breaks " + ", ".join(ids))
@@ -173,7 +186,9 @@ def _semantics(facts: RunFacts, c: _Collector, ontology: Ontology) -> None:
     terms = ontology.terms_in(facts.question)
     if facts.evidence is not None:
         violated = {
-            v.get("defect") for v in facts.evidence.violations if v.get("severity") == "warning"
+            v.get("defect")
+            for v in facts.evidence.violations
+            if v.get("severity") == "warning" and v.get("rule") not in DATA_CHECKS
         }
         mentioned = {d for t in terms for d in t.defects}
         both = sorted(violated & mentioned)
@@ -182,7 +197,12 @@ def _semantics(facts: RunFacts, c: _Collector, ontology: Ontology) -> None:
     needs = [t for t in terms if t.requires_period]
     if needs and facts.status in (None, "answered") and facts.evidence is not None:
         said = " ".join([facts.question, facts.answer, *facts.assumptions])
-        if not YEAR.search(said) and not WHOLE_PERIOD.search(facts.question):
+        asks_for_a_count = COUNT_QUESTION.search(facts.question)
+        if (
+            not YEAR.search(said)
+            and not WHOLE_PERIOD.search(facts.question)
+            and not asks_for_a_count
+        ):
             c.fire("unstated_parameter", f"'{needs[0].name}' needs a period and none was given")
 
 
