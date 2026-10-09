@@ -51,4 +51,5 @@ pythonpath = ["src", "."]
 testpaths = ["tests"]
 markers = [
     "integration: needs the legacy Postgres (make db-up && make seed); skipped when it is unreachable",
+    "llm: calls a real model; runs only with LB_RUN_LLM_TESTS=1 (slow, not deterministic)",
 ]
