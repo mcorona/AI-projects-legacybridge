@@ -12,6 +12,7 @@ tables also go to ``docs/eval-report.md`` together with the reading notes.
 from __future__ import annotations
 
 import argparse
+import itertools
 import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -29,6 +30,7 @@ from legacybridge.llm.profiles import CONFIG_PATH
 ROOT = Path(__file__).resolve().parent
 REPORTS = ROOT / "reports"
 DOCS = ROOT.parent / "docs" / "eval-report.md"
+NOTES = ROOT / "notes"  # hand-written reading of one run: <run-id>.md
 REFERENCE_ARM = "full"
 ABLATION_PROFILE = "local-qwen"
 GOLDEN = {c.id: c for c in load_golden()}
@@ -240,6 +242,77 @@ def detector_section(run: Run, summaries: dict) -> list[str]:
     return lines + table(["Profile", "Threshold", "TP/FP/FN/TN", "Precision", "Recall"], rows)
 
 
+def unfinished(records: list[Record]) -> int:
+    """Runs where the writer's loop did not finish (the 10-step limit or no finish call)."""
+    return sum(1 for r in records if r.result.abstain_reason == "no_answer")
+
+
+def step_limit_line(run: Run, arms: list[str]) -> list[str]:
+    counts = ", ".join(
+        f"{arm} {unfinished(run.records(ABLATION_PROFILE, arm))}/"
+        f"{len(run.records(ABLATION_PROFILE, arm))}"
+        for arm in arms
+    )
+    return [
+        f"Runs that ended because the writer did not finish within its step limit (`no_answer`): "
+        f"{counts}. Part of what an arm loses in coverage is steps, not wrong answers.",
+        "",
+    ]
+
+
+def confidence_cap_line(run: Run, arms: list[str]) -> list[str]:
+    if "no-verify" not in arms:
+        return []
+    delivered = [
+        r.result.confidence
+        for r in run.records(ABLATION_PROFILE, "no-verify")
+        if r.result.status in ("answered", "pending_approval")
+    ]
+    top = max(delivered, default=0.0)
+    if top >= TAU:
+        return []
+    return [
+        f"Without the verifier nobody checked the answer, so its confidence starts at 0.55: the "
+        f"highest confidence `no-verify` delivered is {top:.2f}, below tau = {TAU}. Its SWAR rate "
+        "is 0 **by construction** and says nothing about its wrong answers; compare *Silently "
+        "wrong*, which has no confidence condition.",
+        "",
+    ]
+
+
+def _rows_key(record: Record) -> tuple | None:
+    evidence = record.result.evidence
+    if evidence is None:
+        return None
+    return tuple(sorted(tuple(str(c) for c in row) for row in evidence.rows))
+
+
+def agreement_section(run: Run) -> list[str]:
+    """Wrong answers that two different models give in the same way point at the question, the
+    golden answer or the shared semantic layer rather than at luck."""
+    pairs = list(itertools.combinations([p for p in run.profiles if run.records(p)], 2))
+    if not pairs:
+        return ["_Only one profile was run, so there is nothing to compare._", ""]
+    lines = [
+        "Query answers (not writes) that both profiles delivered wrong, and how many of those "
+        "have the identical result set. Two independent models agreeing with each other and not "
+        "with the golden answer is a lead on the question, the golden answer or the shared "
+        "semantic layer, not proof of which of them is right.",
+        "",
+    ]
+    rows = []
+    for a, b in pairs:
+        first = {r.case_id: r for r in run.records(a) if r.kind == "silently_wrong"}
+        second = {r.case_id: r for r in run.records(b) if r.kind == "silently_wrong"}
+        both = sorted(c for c in first if c in second and first[c].category != "write")
+        same = [
+            c for c in both if (k := _rows_key(first[c])) is not None and k == _rows_key(second[c])
+        ]
+        rows.append([f"{a} / {b}", str(len(both)), ", ".join(both) or "-",
+                     f"{len(same)}: " + (", ".join(same) or "-")])  # fmt: skip
+    return lines + table(["Pair", "Wrong in both", "Cases", "Identical result set"], rows)
+
+
 def ablation_section(run: Run, summaries: dict) -> list[str]:
     present = [a for a in ARMS if (ABLATION_PROFILE, a) in summaries]
     if len(present) < 2:
@@ -253,6 +326,8 @@ def ablation_section(run: Run, summaries: dict) -> list[str]:
                      f"{s['usage']['llm_calls']:.1f}"])  # fmt: skip
     lines = table(["Arm", "Handled correctly", "Accuracy", "Coverage", "SWAR rate", "Silently wrong",
                    "Abstention", "p50", "Calls/q"], rows)  # fmt: skip
+    lines += step_limit_line(run, present)
+    lines += confidence_cap_line(run, present)
     lines += [
         "The `no-verify` arm removes the independent verifier; `no-semantic` removes the ontology, "
         "the business summary in the prompts, the ontology tool and the rule warnings. **In the "
@@ -440,7 +515,7 @@ def make_charts(run: Run, summaries: dict, out: Path) -> list[Path]:
 
 # ============================================================================ the report
 def build(run: Run, *, charts: list[Path] | None = None, notes: list[str] | None = None,
-          corrected: list[str] | None = None) -> str:  # fmt: skip
+          corrected: list[str] | None = None, commentary: str | None = None) -> str:  # fmt: skip
     summaries = {
         key: summarize(records, GOLDEN, prices=prices(key[0]), attacks=run.attacks)
         for key, records in run.arms.items() if records
@@ -451,6 +526,7 @@ def build(run: Run, *, charts: list[Path] | None = None, notes: list[str] | None
     lines += ["## Security", ""] + security_section(run)
     lines += ["## By category", ""] + category_section(run, summaries)
     lines += ["## Defect compliance", ""] + defect_section(run, summaries)
+    lines += ["## Where the profiles fail together", ""] + agreement_section(run)
     lines += ["## The SWAR detector", ""] + detector_section(run, summaries)
     lines += ["## Ablation: what the verifier and the semantic layer are worth", ""]
     lines += ablation_section(run, summaries)
@@ -464,6 +540,11 @@ def build(run: Run, *, charts: list[Path] | None = None, notes: list[str] | None
             ["## Charts", ""] + [f"![{p.stem}]({p.parent.name}/{p.name})" for p in charts] + [""]
         )
     lines += ["## Appendix: runs that were not correct", ""] + appendix(run)
+    if commentary:
+        lines += ["## Reading the failures", "",
+                  "_Written by hand after reading the stored results. The numbers elsewhere in this "
+                  "report are generated; these paragraphs are interpretation and can be wrong._", "",
+                  commentary.strip(), ""]  # fmt: skip
     lines += ["## How to read this", ""] + READING_NOTES + [""]
     return "\n".join(lines)
 
@@ -507,7 +588,9 @@ def main(argv: list[str] | None = None) -> int:
         if charts or args.no_charts
         else ["Charts were skipped: matplotlib is not installed (`uv sync --group eval`)."]
     )
-    text = build(run, charts=charts, notes=notes, corrected=corrected)
+    note_file = NOTES / f"{run_id}.md"
+    commentary = note_file.read_text(encoding="utf-8") if note_file.exists() else None
+    text = build(run, charts=charts, notes=notes, corrected=corrected, commentary=commentary)
     path = REPORTS / f"eval-{run_id}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")

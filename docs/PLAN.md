@@ -296,8 +296,8 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 ### Fase 6 — Evals reproducibles + eval gate en CI (Semana 5)
 **Objetivo:** números que puedas poner en un README y defender en una entrevista.
 
-- [ ] `evals/run_evals.py --profiles local-qwen,omniroute-free --set golden,attacks` (`bedrock-claude` se suma en la Fase 7)
-- [ ] Métricas:
+- [x] `evals/run_evals.py --profiles local-qwen,omniroute-free --set golden,attacks` (`bedrock-claude` se suma en la Fase 7)
+- [x] Métricas:
 
   | Métrica | Definición |
   |---|---|
@@ -310,13 +310,24 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
   | Costo / pregunta | Tokens × precio por perfil |
   | Latencia p50 / p95 | Por perfil |
 
-- [ ] Reporte automático en `evals/reports/<fecha>.md` + gráficas PNG
-- [ ] Ablation: **con vs sin** capa semántica, y **con vs sin** verifier (esto demuestra el valor de la arquitectura)
-- [ ] GitHub Actions: `ruff`, `pytest` y un **eval gate** sobre un subconjunto de 20 casos con el perfil local o un mock. Falla si el SWAR rate sube más de 2 pp o si el security pass rate baja de 100 %
-- [ ] `docs/eval-report.md` con la tabla final
+- [x] Reporte automático en `evals/reports/<fecha>.md` + gráficas PNG
+- [x] Ablation: **con vs sin** capa semántica, y **con vs sin** verifier (esto demuestra el valor de la arquitectura)
+- [x] GitHub Actions: `ruff`, `pytest` y un **eval gate** sobre un subconjunto de 20 casos con un oráculo sin LLM (el runner no tiene modelo; ADR-013). Falla si el SWAR rate sube más de 2 pp o si el security pass rate baja de 100 %
+- [x] `docs/eval-report.md` con la tabla final
 
 **Verificación:** `make eval` genera el reporte; un PR que rompa el guard hace fallar CI.
 **DoD:** el eval report tiene números reales de al menos 2 perfiles (`local-qwen` y `omniroute-free`) y la ablation incluida; la comparación con Bedrock se agrega en la Fase 7.
+
+**Estado (2026-10-09): cumplida, con salvedades que importan.** 720 tests en verde, lint limpio, CI en verde (lint, test, eval-gate). Corrida `20261009`: 80 casos de oro y 45 ataques en `local-qwen` (`qwen3.6-35b-a3b`) y `omniroute-free` (`nemotron-3-ultra-550b-a55b:free`, modelo individual), más las dos ablaciones en `local-qwen`; una corrida por brazo. Informe en `docs/eval-report.md` (generado, con gráficas en `evals/reports/eval-20261009/`).
+- **Seguridad:** 45/45 ataques bloqueados o neutralizados (IC 0.92–1.00); 11/11 de los que tienen comprobación en la BD los rechaza `lb_reader` sin guard. Esta cifra no depende del golden set ni de ningún modelo.
+- **Exactitud (golden en borrador):** `local-qwen` 0.29 (16/55) y `omniroute-free` 0.53 (29/55); **SWAR rate** 0.30 (11/37) y 0.17 (8/47). Abstención correcta 14/15 y escrituras 9/10 en ambos. Los dos modelos son distintos y no se contrastan entre sí.
+- **Ablación (`local-qwen`, pareada por caso):** sin verifier, 1 caso a favor de `full` y 3 en contra (p = 0.62, **no se distingue**); sin capa semántica, 17 y 6 (p = 0.035, se distingue). **Pero** 44 de las 80 corridas de `no-semantic` terminaron por agotar los 10 pasos del escritor (2 en `full`): la caída mezcla «la ontología ahorra pasos» con «la ontología evita errores», y entre las respuestas entregadas el brazo no se distingue (5/22 erróneas contra 12/37). Un brazo con más pasos las separaría; **no se corrió**. El SWAR rate de `no-verify` es 0 **por construcción** (sin verifier la confianza se queda en 0.55); se compara con «erróneas con cualquier confianza».
+- **Hallazgo principal:** el error más común es una **interpretación compartida**, no ruido. En JOIN-005/006/009/019/020 ambos modelos cuentan solo facturas válidas (`status='V'`, sin duplicados) donde el SQL de referencia cuenta todas; cuatro de los seis casos que ambos fallan tienen el mismo conjunto de filas. En JOIN-005/009 la pregunta dice «al menos un registro»: ahí el agente se pasó de la pregunta. En JOIN-006/019/020 («folios distintos») la definición de negocio la tiene que decidir una persona. El verifier coincidió con esas respuestas (usa las mismas reglas) y el detector no las ve (6/11 y 8/8 respuestas erróneas con riesgo ≤ 0.20): sus señales semánticas se disparan cuando una regla se **viola**, y aquí se **cumplió**.
+- **Cobertura:** el mayor costo no son los errores sino lo que no se responde: de 55 preguntas respondibles, `local-qwen` pidió aclaración 15 veces, se abstuvo como «fuera de alcance» 8, falló por `llm_error` 4; `omniroute-free` pidió aclaración 16.
+- **Detector:** recall 5/12 (`local-qwen`) y 1/9 (`omniroute-free`) a 0.3 y 0.5; precision 0.50–0.56 y 0.14–0.20. La Fase 5 midió 3/5 sobre otros 20 casos; las muestras no son comparables en sentido estricto, y el recall sigue siendo bajo.
+- **Eval gate:** sin LLM (oráculo que ejecuta el SQL de referencia): 45 ataques, 20 casos fijos y línea base del detector, tolerancia ±2 pp, y dice qué **no** mide. Probado con sabotaje: localmente (guard desactivado, oráculo erróneo) y en un PR desechable real, que dejó el CI en rojo; la rama y el PR se cerraron. Un defecto real que halló: sin `ANALYZE` en una BD recién sembrada el SQL de TRAP-007 excedía el tiempo y el gate pasaba con una población menor; `seed` ejecuta `ANALYZE` y el gate exige que toda consulta de referencia corra.
+- **Sin cambios tras ver resultados:** no se reetiquetó ni se reajustó nada. Las lecturas de arriba están en `evals/notes/20261009.md` y se rotulan en el informe como interpretación redactada a mano.
+- **Pendiente tuyo 👤:** validar el golden set (`review: approved`); hasta entonces cada cifra de exactitud es provisional, y los hallazgos de JOIN dependen de esa validación. Decidir si se corre el brazo `no-semantic` con más pasos (gratis, ~1–2 h).
 
 ---
 

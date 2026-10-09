@@ -107,6 +107,57 @@ def test_unrun_arms_and_profiles_are_said_not_filled_in():
     assert "not run" in build(run)
 
 
+# --------------------------------------------------------------------------- what the ablation caveats say
+def test_the_ablation_counts_runs_that_ran_out_of_steps_per_arm():
+    full = good("local-qwen", "full")
+    stuck = ((("local-qwen", "no-semantic")), [
+        rec(c, "loud_failure", status="abstained", confidence=0.0, abstain_reason="no_answer")
+        for c in ANSWER[:4]] + [rec(c, "correct") for c in ANSWER[4:10]])  # fmt: skip
+    text = build(run_with(full, stuck))
+    assert "full 0/10, no-semantic 4/10" in text and "steps, not wrong answers" in text
+
+
+def test_a_verifier_free_arm_that_cannot_reach_the_threshold_says_its_swar_rate_is_zero_by_construction():
+    capped = good("local-qwen", "no-verify", n_wrong=3)
+    capped[1][:] = [rec(r.case_id, r.kind, confidence=0.55) for r in capped[1]]
+    text = build(run_with(good("local-qwen", "full"), capped))
+    assert "highest confidence `no-verify` delivered is 0.55" in text and "by construction" in text
+    confident = good("local-qwen", "no-verify", n_wrong=3)  # confidence 0.95: no such caveat
+    assert "by construction" not in build(run_with(good("local-qwen", "full"), confident))
+
+
+# --------------------------------------------------------------------------- where profiles fail together
+def test_wrong_answers_two_profiles_share_are_listed_and_identical_result_sets_are_counted():
+    a, b = ANSWER[0], ANSWER[1]
+    qwen = [rec(a, "silently_wrong", rows=((240,),)), rec(b, "silently_wrong", rows=((2,),)),
+            rec(ANSWER[2], "silently_wrong", rows=((9,),)), rec(ANSWER[3], "correct")]  # fmt: skip
+    omni = [rec(a, "silently_wrong", rows=((240,),)), rec(b, "silently_wrong", rows=((3,),)),
+            rec(ANSWER[2], "correct"), rec(ANSWER[3], "silently_wrong")]  # fmt: skip
+    run = run_with((("local-qwen", "full"), qwen), (("omniroute-free", "full"), omni))
+    row = [ln for ln in report.agreement_section(run) if ln.startswith("| local-qwen / ")]
+    assert row == [f"| local-qwen / omniroute-free | 2 | {a}, {b} | 1: {a} |"]
+
+
+def test_one_profile_has_nothing_to_compare():
+    assert "nothing to compare" in " ".join(
+        report.agreement_section(run_with(good("local-qwen", "full")))
+    )
+
+
+# --------------------------------------------------------------------------- the hand-written reading
+def test_the_hand_written_reading_is_marked_as_interpretation_and_only_added_when_given():
+    run = run_with(good("local-qwen", "full"))
+    assert "## Reading the failures" not in build(run)
+    text = build(run, commentary="**1. Something I saw.**")
+    assert "## Reading the failures" in text and "**1. Something I saw.**" in text
+    assert "interpretation and can be wrong" in text
+
+
+def test_the_committed_reading_of_run_20261009_exists():
+    path = report.NOTES / "20261009.md"
+    assert path.exists() and path.read_text().startswith("**1.")
+
+
 # --------------------------------------------------------------------------- the ablation
 def test_the_ablation_reports_discordant_pairs_and_the_exact_p_without_adjectives_it_cannot_back():
     full = good("local-qwen", "full")
