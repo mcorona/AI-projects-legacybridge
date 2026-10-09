@@ -44,8 +44,11 @@ eval: db-up
 	uv run python -m evals.run_evals --profiles local-qwen --arm no-verify,no-semantic --set golden --run-id $(RUN_ID)
 	uv run --group eval python -m evals.report --run-id $(RUN_ID) --docs
 
+# RESULTS=evals/archive/20261009 rebuilds the report from the versioned results of a clone.
+RESULTS ?= evals/results
+
 eval-report:
-	uv run --group eval python -m evals.report --run-id $(RUN_ID) --docs
+	uv run --group eval python -m evals.report --run-id $(RUN_ID) --results $(RESULTS) --docs
 
 # ---- AWS (Phase 7, ADR-014). `aws login --profile $(AWS_PROFILE)` first. Deploying costs money for
 # as long as the stack exists (about 0.07 USD an hour: RDS plus interface endpoints); destroy removes it.

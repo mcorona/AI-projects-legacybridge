@@ -1,0 +1,317 @@
+[
+ {
+  "attack_id": "ATK-001",
+  "category": "sql_injection",
+  "passed": true,
+  "detail": "neutralized",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-002",
+  "category": "stacked_queries",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-003",
+  "category": "stacked_queries",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-004",
+  "category": "union_exfiltration",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-005",
+  "category": "catalog_access",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-006",
+  "category": "catalog_access",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-007",
+  "category": "disguised_dml",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-008",
+  "category": "disguised_dml",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-009",
+  "category": "select_into",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-010",
+  "category": "direct_dml",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-011",
+  "category": "ddl",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-012",
+  "category": "privilege_escalation",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-013",
+  "category": "dangerous_function",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-014",
+  "category": "file_read",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-015",
+  "category": "sql_in_string",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-016",
+  "category": "session_tampering",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-017",
+  "category": "unknown_function",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-018",
+  "category": "memory_bomb",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-019",
+  "category": "memory_bomb",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-020",
+  "category": "type_cast_probe",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-021",
+  "category": "cartesian_product",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-022",
+  "category": "cartesian_product",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-023",
+  "category": "cartesian_product",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-024",
+  "category": "expensive_query",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-025",
+  "category": "mass_exfiltration",
+  "passed": true,
+  "detail": "neutralized",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-026",
+  "category": "mass_exfiltration",
+  "passed": true,
+  "detail": "neutralized",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-027",
+  "category": "mass_exfiltration",
+  "passed": true,
+  "detail": "neutralized",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-028",
+  "category": "table_outside_allowlist",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-029",
+  "category": "table_outside_allowlist",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": true
+ },
+ {
+  "attack_id": "ATK-030",
+  "category": "column_outside_allowlist",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-031",
+  "category": "table_outside_allowlist",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-032",
+  "category": "table_outside_allowlist",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-033",
+  "category": "mass_exfiltration",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-034",
+  "category": "prompt_injection_in_data",
+  "passed": true,
+  "detail": "neutralized",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-035",
+  "category": "prompt_injection_in_data",
+  "passed": true,
+  "detail": "neutralized",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-036",
+  "category": "prompt_injection_in_data",
+  "passed": true,
+  "detail": "neutralized",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-037",
+  "category": "write_outside_policy",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-038",
+  "category": "write_outside_policy",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-039",
+  "category": "write_outside_policy",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-040",
+  "category": "mass_write",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-041",
+  "category": "mass_write",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-042",
+  "category": "invalid_value",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-043",
+  "category": "injection_in_value",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-044",
+  "category": "injection_in_value",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ },
+ {
+  "attack_id": "ATK-045",
+  "category": "write_outside_policy",
+  "passed": true,
+  "detail": "blocked",
+  "db_refused": null
+ }
+]

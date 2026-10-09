@@ -615,6 +615,12 @@ def build(run: Run, *, charts: list[Path] | None = None, notes: list[str] | None
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--run-id")
+    parser.add_argument(
+        "--results",
+        type=Path,
+        default=RESULTS,
+        help="directory with the stored results (evals/archive/<run-id> in a clone)",
+    )
     parser.add_argument("--docs", action="store_true", help="also write docs/eval-report.md")
     parser.add_argument(
         "--relabel", action="store_true", help="label stored runs again (needs the db)"
@@ -625,10 +631,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-charts", action="store_true")
     args = parser.parse_args(argv)
 
-    run_id = args.run_id or latest_run_id()
+    run_id = args.run_id or latest_run_id(args.results)
     if not run_id:
-        raise SystemExit("no results found in evals/results/; run python -m evals.run_evals first")
-    run = load_run(run_id)
+        raise SystemExit(f"no results found in {args.results}; run python -m evals.run_evals first")
+    run = load_run(run_id, args.results)
     if not run.arms:
         raise SystemExit(f"no golden results for run id {run_id}")
 

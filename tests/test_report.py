@@ -1,5 +1,7 @@
 """The report generator (ADR-013): it reads stored results and writes figures it can account for."""
 
+from pathlib import Path
+
 import pytest
 
 from evals import report
@@ -211,7 +213,9 @@ def test_charts_are_written_when_matplotlib_is_available(tmp_path):
 def test_the_report_says_when_charts_were_skipped(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(report, "REPORTS", tmp_path)
     monkeypatch.setattr(report, "RESULTS", tmp_path)
-    monkeypatch.setattr(report, "load_run", lambda run_id: run_with(good("local-qwen", "full")))
+    monkeypatch.setattr(
+        report, "load_run", lambda run_id, results: run_with(good("local-qwen", "full"))
+    )
     monkeypatch.setattr(report, "make_charts", lambda *a, **k: [])
     assert report.main(["--run-id", "t1"]) == 0
     assert "Charts were skipped" in (tmp_path / "eval-t1.md").read_text()
@@ -289,3 +293,36 @@ def test_a_model_comparison_names_the_better_model_not_a_reference():
     assert (
         "the reference handled" not in section and "Right only with 1st / only with 2nd" in section
     )
+
+
+# --------------------------------------------------------------------------- stored results of a clone
+def test_the_report_can_be_built_from_a_results_directory_given_on_the_command_line(
+    monkeypatch, tmp_path
+):
+    results, out = tmp_path / "archive", tmp_path / "reports"
+    results.mkdir()
+    (results / "eval-t9-local-qwen-full.jsonl").write_text(
+        "\n".join(rec(c, "correct").model_dump_json() for c in ANSWER[:3]) + "\n"
+    )
+    monkeypatch.setattr(report, "REPORTS", out)
+    assert report.main(["--results", str(results), "--no-charts"]) == 0, "the run id is found there"
+    text = (out / "eval-t9.md").read_text()
+    assert "Evaluation report t9" in text and "local-qwen" in text
+
+
+def test_a_results_directory_with_nothing_in_it_says_where_it_looked(tmp_path):
+    with pytest.raises(SystemExit, match=str(tmp_path)):
+        report.main(["--results", str(tmp_path)])
+
+
+def test_the_archived_run_is_complete_and_has_every_profile_and_arm():
+    """The README and the cost model are rebuilt from evals/archive/: it must hold the whole run."""
+    archive = Path(__file__).resolve().parents[1] / "evals" / "archive" / "20261009"
+    run = load_run("20261009", archive)
+    assert sorted(run.arms) == [
+        ("bedrock-claude", "full"), ("bedrock-claude-opus", "full"), ("bedrock-claude-sonnet", "full"),
+        ("local-qwen", "full"), ("local-qwen", "no-semantic"), ("local-qwen", "no-verify"),
+        ("omniroute-free", "full"),
+    ]  # fmt: skip
+    assert all(len(records) == 80 for records in run.arms.values())
+    assert run.attacks is not None and len(run.attacks) == 45 and all(o.passed for o in run.attacks)
