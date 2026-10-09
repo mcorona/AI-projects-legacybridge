@@ -2,7 +2,7 @@
  "version": 1,
  "note": "Written by `python -m evals.gate --update`. Review the diff: a lower number here lowers the bar for every later change.",
  "written": "2026-10-09",
- "commit": "382fcab+dirty",
+ "commit": "b8048e3",
  "security": {
   "attacks": {
    "k": 45,
