@@ -277,7 +277,7 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
   2. **Trayectoria:** bucles de tools (>N llamadas iguales), cascadas de errores, reintentos de SQL
   3. **Semántica:** la pregunta toca entidades con defectos conocidos y el SQL no aplica la regla
 - [x] **Early warning:** puntaje de riesgo calculado con los primeros *k* spans; si supera un umbral, el agente escala (otro modelo, pregunta aclaratoria o abstención)
-- [~] 👤 Write‑up corto `docs/swar-method.md` que conecte con tu tesis (*Software Behavior Prediction Using Ontologies*, 2015): misma idea, de trazas de software a trazas de agentes
+- [x] 👤 Write‑up corto `docs/swar-method.md` que conecte con tu tesis (*Software Behavior Prediction Using Ontologies*, 2015): misma idea, de trazas de software a trazas de agentes *(apartado de tesis mínimo, con solo título, año e idea; el autor decidió dejarlo así el 2026-10-09)*
 
 **Verificación:** correr 20 casos del golden set y ver las trazas en Phoenix (`http://localhost:6006`); `uv run pytest tests/test_swar.py`.
 **DoD:** cada respuesta incluye `swar_risk`; el detector tiene precision/recall medidos contra las etiquetas del golden set.
@@ -289,7 +289,7 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 - **El early warning no actuó en ninguna de las 40 corridas reales** (C1 alcanzado en 5, ninguna sobre el umbral; C2 marcó 0 de 5). Con estos pesos `gate` y `annotate` se habrían comportado igual. El mecanismo está verificado con pruebas guionizadas, no con un caso real, y esta muestra **no respalda** que los primeros spans ya anticipen el error.
 - **Corregido después de ver resultados:** cinco errores de definición (cuatro del detector, uno de las etiquetas) hallados por la línea base y las corridas; ninguno cambió un peso ni un umbral. Los tres casos reetiquetados pasaron todos de «errónea» a «correcta»; los informes conservan las cifras *como corrieron*.
 - **Muestras diminutas** (2, 3 y 5 positivos): los intervalos abarcan casi todo el rango. El golden set sigue en `review: draft`. Los dos perfiles usan modelos distintos y `omniroute-free` se validó con un modelo individual porque el combo da HTTP 500.
-- **Pendiente tuyo 👤:** el apartado de tu tesis en `docs/swar-method.md` (el resto del documento está redactado). Y revisar el golden set.
+- **Apartado de tu tesis:** se queda mínimo en `docs/swar-method.md`, por decisión tuya (2026-10-09). **Pendiente tuyo 👤:** revisar el golden set.
 
 ---
 
@@ -368,7 +368,7 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 - [x] `docs/adr/`: ADR‑001…009 (contexto, decisión, consecuencias) *(ADR-008 y 009 escritos ahora (decididos en la Fase 7) e índice de los 14)*
 - [x] `docs/threat-model.md`: STRIDE + OWASP Top 10 for LLM Applications, mapeado a controles y tests *(7 fronteras STRIDE, OWASP LLM 2025 y los 45 ataques uno por uno; un test comprueba que lo que cita existe)*
 - [x] `docs/cost-model.md`: costo por pregunta y por mes (100 / 1k / 10k preguntas diarias) local vs Bedrock *(generado; encontró un defecto de costo en las métricas del tablero (55 series, ahora 15))*
-- [ ] 👤 Video demo de ≤3 min: pregunta trampa → el agente aplica la regla del defecto → ataque bloqueado → escritura con aprobación → traza en Phoenix/CloudWatch *(guion y comandos en `docs/demo/SCRIPT.md`; la demo sin modelo (GIF) ya está en el README)*
+- [ ] 👤 Video demo de ≤3 min: pregunta trampa → el agente aplica la regla del defecto → ataque bloqueado → escritura con aprobación → traza en Phoenix/CloudWatch *(guion y comandos en `docs/demo/SCRIPT.md`; la demo sin modelo (GIF) ya está en el README)* *(2026-10-09: se subió a Upwork una versión de 52 s con la demo sin modelo; el video del agente en vivo sigue siendo opcional)*
 - [x] Release `v1.0.0` con changelog *(publicado como `v1.0.0-rc1`, pre-release: https://github.com/mcorona/AI-projects-legacybridge/releases/tag/v1.0.0-rc1; pasa a `v1.0.0` cuando valides el golden)*
 - [ ] 👤 Post en LinkedIn: *"Conecté un agente de IA a una base de datos legada con 18+ defectos reales. Esto es lo que aprendí sobre los errores silenciosos."* *(borradores EN/ES y la imagen de resultados en `~/LegacyBridge Portfolio/`)*
 - [ ] Agregar el repo a **Featured** y **Projects** en LinkedIn, y fijarlo (pin) en GitHub
@@ -381,7 +381,7 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 - **Auditoría previa a publicar:** historial completo (72 commits) sin claves, tokens, llaves privadas ni `.env`; el ID de la cuenta de AWS no aparece nunca. Única mención de un identificador: el ID de un guardrail **ya borrado** en dos commits (se agregó y se quitó); no se reescribió el historial.
 - **Publicación (con tu «sí» explícito):** `main` del repo público `mcorona/AI-projects-legacybridge` es esta versión (`--force-with-lease`); descripción y temas actualizados (se quitó `pgvector`; se agregaron `opentelemetry`, `aws-cdk`, `human-in-the-loop`); release `v1.0.0-rc1` como pre-release. El CI pasa en los cinco jobs **en el repo público**, incluido el quickstart del README. Por decisión tuya (2026-10-09, «una sola versión») la versión anterior **no** queda publicada: se borraron la rama `v1` y la etiqueta `v1-final` del repo público y se conserva solo un respaldo local (`git bundle` en `~/LegacyBridge Portfolio/v1-archive/`). El repo privado `AI-projects-legacybridge-agent` se borró el mismo día (tenía el mismo historial; solo se perdió el PR n.º 1 desechable de la prueba de sabotaje del CI): GitHub tiene un solo repo de LegacyBridge y el remoto `origin` apunta a él.
 - **LinkedIn y Upwork (2026-10-09):** el artículo y el post existentes se reescribieron con la versión actual (mismas URL), el comentario viejo conserva solo el enlace a Inventory Copilot, Upwork tiene una sola tarjeta de LegacyBridge y va primero, y el artículo y el post están en Destacados. Presentación en el README: «independent AI architect and consultant» (tu titular de LinkedIn); apartado de tesis mínimo en `docs/swar-method.md`, con solo lo que dejaste en este PLAN.
-- **Falta (tuyo 👤):** grabar el video; validar el golden set (→ `v1.0.0`); ampliar el apartado de tesis; el pin en GitHub.
+- **Falta (tuyo 👤):** validar el golden set (→ `v1.0.0`; hoja de revisión generada fuera del repo); el pin en GitHub; comprobar los Destacados de LinkedIn. **Opcional:** el video del agente en vivo (el que está en Upwork es la demo sin modelo, de 52 s). El apartado de tesis se queda mínimo por decisión tuya.
 - **Decisión tomada:** una sola versión pública de LegacyBridge (la actual) en GitHub, LinkedIn y Upwork; el material de la versión anterior solo existe como archivo local fuera del repo.
 
 ---
