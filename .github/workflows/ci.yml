@@ -1,0 +1,92 @@
+# CI for LegacyBridge (Phase 6, ADR-013).
+#
+# Three independent jobs: lint, the test suite, and the eval gate. None of them needs a model, a
+# secret or network access beyond fetching dependencies: the database is a throwaway Postgres on
+# the runner, seeded with the synthetic data (the passwords in .env.example are development
+# values for that database only).
+#
+# The eval gate does NOT measure the quality of any model; it guards the guard, the tools, the
+# labels, the metrics and the detector against regressions (see evals/gate.py).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.11.28"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - name: Start the database
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait
+      - name: Seed the synthetic data
+        run: uv run python -m scripts.seed --seed 42
+      - name: Tests (live-model tests are skipped unless LB_RUN_LLM_TESTS is 1)
+        run: uv run pytest -q
+      - name: Database logs
+        if: failure()
+        run: docker compose logs --no-color legacy-db | tail -80
+
+  eval-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - name: Start the database
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait
+      - name: Seed the synthetic data
+        run: uv run python -m scripts.seed --seed 42
+      - name: Eval gate (no model - attacks, oracle on 20 fixed cases, detector baseline)
+        run: uv run python -m evals.gate
+      - name: Database logs
+        if: failure()
+        run: docker compose logs --no-color legacy-db | tail -80
