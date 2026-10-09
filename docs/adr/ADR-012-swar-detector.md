@@ -107,3 +107,41 @@ wrong answer (TRAP-009) raises no rule signal at all: the rules are blind to it 
 These fixes were motivated by golden cases, which is why the 20-case subset was fixed and committed
 before the baseline ran, and why none of the cases that exposed them (JOIN-001, TRAP-007, TRAP-020)
 belongs to it, except TRAP-019, whose behaviour follows from fix 2 and not from its label.
+
+## Changes after the first live run (2026-10-09)
+
+The first live run (local Qwen, the fixed 20-case subset) exposed a fourth definition error:
+
+4. **A verdict was treated as speaking for the final answer when it judged an earlier attempt.** The
+   verifier disagreed with attempt 0, the writer retried, the retry got no verdict, and the run was
+   scored `verifier_disagreed_final`. A verdict now only counts for the attempt it judged; an
+   unjudged final answer is `unverified`, with an earlier disagreement recorded as
+   `verifier_disagreed_retried`.
+
+Because the detector is a pure function of what a result stores, the stored runs were **rescored**
+with the corrected detector, and the report shows both versions. This does not make the rescored
+numbers an independent test: the defect was seen in those very runs. In fact the fix moved one case
+(TRAP-006, 0.98 to 0.92) and **no cell of the confusion tables**; that case stays "high" because its
+trajectory really was erratic (repeated calls, a cascade of failures) although its final answer was
+right. That is a false alarm of a detector that scores the run and not only the answer, and it is
+reported as one.
+
+## What the first live run says about the early warning
+
+Local Qwen, 20 cases, 13 delivered answers of which 3 were silently wrong (a different result set,
+two of them after a writer retry and a verifier disagreement; one that mentions figures that are not
+in its evidence). None of the three was visible to the static rules.
+
+| | silently wrong flagged | correct flagged |
+|---|---|---|
+| risk >= 0.5, final | 3/3 | 2/10 |
+| risk >= 0.7 (action threshold), final | 1/3 | 1/10 |
+| risk >= 0.7 at **C2**, before the verifier | **0/3** | 0/10 |
+
+So, on this sample, **the early warning would not have caught any of the three wrong answers before
+the verifier ran**. The writer produced them cleanly; what exposed them was the verifier disagreeing,
+or flailing. The claim that a risk computed from the first spans is informative is **not supported
+here**. What the checkpoints can still do is stop a stuck loop and spare model calls (C1), which this
+sample did not exercise. Whether `gate` improves the SWAR rate is the Phase 6 ablation; this phase
+only shows that the detector, with the verifier's verdict, separates most wrong answers (recall 3/3 at
+0.5), at a cost of two false alarms in ten correct answers.

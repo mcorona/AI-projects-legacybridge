@@ -10,6 +10,7 @@ from evals.swar_eval import (
     confusion,
     load_subset,
     population,
+    rescore,
     risk_with,
     run_oracle,
     wilson,
@@ -120,3 +121,42 @@ async def test_the_baseline_keeps_its_measured_properties(db_available):
         r for r in pop if r.variant == "oracle-expected" and r.category == "defect_trap"
     ]
     assert traps_expected and all(r.result.swar_risk < 0.5 for r in traps_expected)
+
+
+def test_rescoring_applies_the_current_detector_to_stored_runs():
+    """A stored run whose verifier disagreed with attempt 0 and was never judged again: scored by the
+    older logic it read as 'disagreed with the final answer'; the current detector knows better."""
+    ontology = __import__(
+        "legacybridge.semantic.loader", fromlist=["load_ontology"]
+    ).load_ontology()
+    from legacybridge.agent.schemas import Event, VerdictRecord
+
+    stored = rec("x", "correct", 0.98, signals=("verifier_disagreed_final", "writer_retry"))
+    stored.result.verdicts = [VerdictRecord(attempt=0, agrees=False, confidence=0.3)]
+    stored.result.events = [
+        Event(
+            role="sql_writer",
+            kind="tool",
+            name="run_query",
+            ok=True,
+            ms=1,
+            attempt=1,
+            args_hash="a",
+        )
+    ]
+    fresh = rescore([stored], ontology, CFG)[0]
+    names = {s.name for s in fresh.result.swar_signals}
+    assert "verifier_disagreed_final" not in names and "verifier_disagreed_retried" in names
+    assert fresh.result.swar_risk < stored.result.swar_risk and fresh.kind == stored.kind
+    assert stored.result.swar_risk == 0.98, "the stored run itself is not modified"
+
+
+def test_a_rescored_report_shows_what_it_looked_like_as_it_ran():
+    ontology = __import__(
+        "legacybridge.semantic.loader", fromlist=["load_ontology"]
+    ).load_ontology()
+    as_run = [rec("a", "correct", 0.98, signals=("verifier_disagreed_final",))]
+    text = build_report(rescore(as_run, ontology, CFG), "u", ontology, CFG, as_run=as_run)
+    assert (
+        "## As it ran, before the detector was fixed" in text and "not an independent test" in text
+    )

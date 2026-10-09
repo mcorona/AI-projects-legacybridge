@@ -144,6 +144,25 @@ def test_verifier_signals():
     assert "unverified" not in names(facts(status="abstained", verdicts=[]))
 
 
+def test_a_verdict_only_speaks_for_the_attempt_it_judged():
+    """Found live: the verifier disagreed with attempt 0, the writer retried, the retry got no
+    verdict, and the answer was reported as 'the verifier disagreed with the final answer'."""
+    first_wrong = [VerdictRecord(attempt=0, agrees=False, confidence=0.3, issues=["count differs"])]
+    retried = [tool(attempt=0), tool(attempt=1, h="b")]
+    found = names(facts(verdicts=first_wrong, events=retried))
+    assert "verifier_disagreed_final" not in found
+    assert {"verifier_disagreed_retried", "unverified", "writer_retry"} <= found
+    # when the retry *was* judged and still disagrees, that is the final verdict
+    both = first_wrong + [VerdictRecord(attempt=1, agrees=False, confidence=0.3, checks_run=1)]
+    assert "verifier_disagreed_final" in names(facts(verdicts=both, events=retried))
+    # judged and agreed after an earlier disagreement: retried, not unverified
+    agreed = first_wrong + [VerdictRecord(attempt=1, agrees=True, confidence=0.9, checks_run=1)]
+    ok = names(facts(verdicts=agreed, events=retried))
+    assert (
+        "verifier_disagreed_retried" in ok and not {"unverified", "verifier_disagreed_final"} & ok
+    )
+
+
 # --------------------------------------------------------------------------- semantics
 def test_a_defect_the_question_touches_and_the_sql_violates():
     both = facts(evidence=evidence(violations=[WARNING]))  # "facturas activas" -> FAC-09

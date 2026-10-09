@@ -170,16 +170,23 @@ def _result(facts: RunFacts, c: _Collector) -> None:
         c.fire("no_evidence", "answered with no query behind it")
 
     verdicts = facts.verdicts
-    if verdicts:
-        last = verdicts[-1]
+    # A verdict only speaks for the attempt it judged. If the writer retried and nobody verified the
+    # answer that was finally given, an earlier disagreement is history, not the final verdict.
+    final_attempt = max((e.attempt for e in facts.events if e.role == "sql_writer"), default=0)
+    judged = [v for v in verdicts if v.attempt == final_attempt]
+    if judged:
+        last = judged[-1]
         if not last.agrees:
             c.fire("verifier_disagreed_final", "; ".join(last.issues)[:160])
         elif any(not v.agrees for v in verdicts):
             c.fire("verifier_disagreed_retried", "the verifier disagreed with an earlier attempt")
         elif last.checks_run == 0 and status != "pending_approval":
             c.fire("no_independent_check", "the verifier re-derived nothing")
-    elif status in ("answered", "pending_approval"):
-        c.fire("unverified", "no verifier verdict")
+    else:
+        if any(not v.agrees for v in verdicts):
+            c.fire("verifier_disagreed_retried", "the verifier disagreed with an earlier attempt")
+        if status in ("answered", "pending_approval"):
+            c.fire("unverified", "the answer that was given was not verified")
 
 
 def _semantics(facts: RunFacts, c: _Collector, ontology: Ontology) -> None:

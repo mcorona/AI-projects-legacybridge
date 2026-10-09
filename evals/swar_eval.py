@@ -35,7 +35,7 @@ from legacybridge.db import connect
 from legacybridge.llm.base import LLMResponse, Message, ToolCall, ToolSpec
 from legacybridge.mcp_server.tools import LegacyTools
 from legacybridge.observability.swar_config import SwarConfig, load_swar_config
-from legacybridge.observability.swar_detector import combine, risk_at
+from legacybridge.observability.swar_detector import assess, combine, facts_from_result, risk_at
 from legacybridge.semantic.loader import Ontology, load_ontology
 
 ROOT = Path(__file__).resolve().parent
@@ -228,6 +228,36 @@ async def run_oracle(
     return records
 
 
+def rescore(
+    records: list[Record], ontology: Ontology | None = None, cfg: SwarConfig | None = None
+) -> list[Record]:
+    """Score stored runs again with the current detector.
+
+    The detector is a pure function of what a result stores (events, evidence, verdicts, answer),
+    so a stored run can be re-assessed after the detector is fixed. The labels do not change."""
+    ontology, cfg = ontology or load_ontology(), cfg or load_swar_config()
+    out = []
+    for r in records:
+        facts = facts_from_result(r.result)
+        facts.events = [
+            e for e in r.result.events if e.escalated == (r.result.escalated_from is not None)
+        ]
+        fresh = assess(facts, ontology, cfg, "final")
+        merged = {s.name: s for s in (r.result.swar_signals if r.result.early_warning else [])}
+        for sig in fresh.signals:
+            merged.setdefault(sig.name, sig)
+        risk = max(fresh.risk, r.result.swar_risk if r.result.early_warning else 0.0)
+        result = r.result.model_copy(
+            update={
+                "swar_risk": risk,
+                "swar_level": cfg.level(risk),
+                "swar_signals": list(merged.values()),
+            }
+        )
+        out.append(r.model_copy(update={"result": result}))
+    return out
+
+
 def load_records(path: Path) -> list[Record]:
     return [
         Record.model_validate_json(line) for line in path.read_text().splitlines() if line.strip()
@@ -320,6 +350,7 @@ def build_report(
     ontology: Ontology | None = None,
     cfg: SwarConfig | None = None,
     notes: list[str] | None = None,
+    as_run: list[Record] | None = None,
 ) -> str:
     ontology, cfg = ontology or load_ontology(), cfg or load_swar_config()
     pop = population(records)
@@ -366,6 +397,26 @@ def build_report(
         f"(n={sum(1 for _, w in rows if not w)}).",
     ]
 
+    if as_run is not None:
+        before = [(r.result.swar_risk, r.kind == "silently_wrong") for r in population(as_run)]
+        lines += [
+            "", "## As it ran, before the detector was fixed", "",
+            "These runs were scored while they ran, by the detector as it was then. It was fixed afterwards "
+            "(ADR-012, change log), and the tables above are the same stored runs **rescored**. "
+            "Because the defect was seen in these very runs, the rescored numbers are not an independent test.",
+            "",
+        ] + confusion_table(before) + ["", "Cases whose risk changed:", ""]  # fmt: skip
+        changed = [
+            (a, b)
+            for a, b in zip(as_run, records, strict=True)
+            if abs(a.result.swar_risk - b.result.swar_risk) > 1e-9
+        ]
+        lines += [
+            f"- {a.case_id}: {a.result.swar_risk:.2f} -> {b.result.swar_risk:.2f} "
+            f"({', '.join(sorted({s.name for s in a.result.swar_signals} ^ {s.name for s in b.result.swar_signals}))})"
+            for a, b in changed
+        ] or ["- none"]
+
     lines += ["", "## Static signals and dynamic signals, separately", "",
               "Static = derivable from the SQL and the question alone (rule violations, an unstated period). "
               "Dynamic = what only a run shows (verifier, trajectory, figures). The rules, the traps and the "
@@ -388,18 +439,32 @@ def build_report(
 
     lines += ["", "## Early warning: risk from the first k events", "",
               f"Replay of the stored events at the action threshold ({cfg.action_threshold:.2f}). "
-              "k = 'all' is the final assessment.", ""]  # fmt: skip
-    lines += ["| k | silently wrong flagged | correct flagged (false alarms) |", "|---|---|---|"]
-    for k in (3, 6, 9, None):
+              "C2 is where the early warning acts before the verifier is spent; the final row adds the verifier.", ""]  # fmt: skip
+    lines += [
+        "| first k events | silently wrong flagged | correct flagged (false alarms) |",
+        "|---|---|---|",
+    ]
 
-        def flagged(r: Record, k=k) -> bool:
-            size = len(r.result.events) if k is None else k
-            return risk_at(r.result, size, ontology, cfg).risk >= cfg.action_threshold
+    def writer_end(r: Record) -> int:
+        """The events up to the end of the writer's last turn: where checkpoint C2 looks."""
+        return (
+            max((i for i, e in enumerate(r.result.events) if e.role == "sql_writer"), default=-1)
+            + 1
+        )
+
+    def size(r: Record, k: int | str) -> int:
+        return len(r.result.events) if k == "all" else writer_end(r) if k == "C2" else int(k)
+
+    for k in (3, 6, 9, "C2", "all"):
+
+        def flagged(r: Record, k: int | str = k) -> bool:
+            return risk_at(r.result, size(r, k), ontology, cfg).risk >= cfg.action_threshold
 
         tp = sum(1 for r in wrong if flagged(r))
         fp = sum(1 for r in pop if r.kind == "correct" and flagged(r))
         n_ok = sum(1 for r in pop if r.kind == "correct")
-        lines.append(f"| {'all' if k is None else k} | {tp}/{len(wrong)} | {fp}/{n_ok} |")
+        label = {"C2": "C2 (end of the writer)", "all": "all (final)"}.get(k, str(k))
+        lines.append(f"| {label} | {tp}/{len(wrong)} | {fp}/{n_ok} |")
 
     acted = [r for r in records if r.result.early_warning]
     lines += ["", f"The early warning acted in {len(acted)} of {len(records)} runs "
@@ -459,6 +524,8 @@ def main(argv: list[str] | None = None) -> int:
     rep = sub.add_parser("report", help="build a report from stored results")
     rep.add_argument("files", nargs="+", type=Path)
     rep.add_argument("--name", required=True)
+    rep.add_argument("--rescore", action="store_true",
+                     help="score the stored runs again with the current detector and show both")  # fmt: skip
     args = parser.parse_args(argv)
 
     if args.command == "baseline":
@@ -475,7 +542,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "report":
         records = [r for f in args.files for r in load_records(f)]
-        print(f"wrote {write_report(build_report(records, args.name), args.name)}")
+        as_run = records if args.rescore else None
+        if args.rescore:
+            records = rescore(records)
+        print(f"wrote {write_report(build_report(records, args.name, as_run=as_run), args.name)}")
         return 0
 
     cases = load_subset()
