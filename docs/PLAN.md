@@ -218,10 +218,10 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 ### Fase 4 — Agente model‑agnostic + human‑in‑the‑loop (Semana 3)
 **Objetivo:** un agente que planea, escribe SQL, **verifica** y sabe abstenerse.
 
-- [ ] `llm/base.py`: interfaz `chat(messages, tools) -> response`, con adaptadores:
+- [x] `llm/base.py`: interfaz `chat(messages, tools) -> response`, con adaptadores:
   - `openai_compat.py` (LM Studio `http://localhost:1234/v1`, OmniRoute `http://localhost:20128/v1`)
   - `bedrock.py` (Converse API, con tool use): la interfaz debe permitirlo, pero el adaptador y su perfil se implementan y validan en la **Fase 7**
-- [ ] Configuración por perfil (`config/models.yaml`; forma indicativa):
+- [x] Configuración por perfil (`config/models.yaml`; forma indicativa):
   ```yaml
   profiles:
     local-qwen:                       # LM Studio, Qwen3.6-35B-A3B
@@ -239,17 +239,29 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
       synthetic_data_only: true
     # bedrock-claude: se agrega en la Fase 7
   ```
-- [ ] Orquestador con 3 roles:
+- [x] Orquestador con 3 roles:
   - **planner**: interpreta la pregunta con la ontología, decide si preguntar, abstenerse o consultar
   - **sql_writer**: genera el SQL usando las tools MCP
   - **verifier**: valida de forma independiente (re‑deriva un conteo o total con otra consulta, revisa `warnings` y `violations`) y asigna `confidence`
-- [ ] Salida estructurada (Pydantic): `answer`, `sql`, `confidence`, `assumptions[]`, `warnings[]`, `status ∈ {answered, needs_clarification, abstained, pending_approval}`
-- [ ] **HITL**: `propose_write` crea una solicitud; `POST /approvals/{id}` la ejecuta con `lb_writer`; todo queda en una tabla de auditoría
-- [ ] CLI: `uv run legacybridge ask "..." --profile local-qwen`
-- [ ] API FastAPI: `POST /ask`, `GET /approvals`, `POST /approvals/{id}`
+- [x] Salida estructurada (Pydantic): `answer`, `sql`, `confidence`, `assumptions[]`, `warnings[]`, `status ∈ {answered, needs_clarification, abstained, pending_approval}`
+- [x] **HITL**: `propose_write` crea una solicitud; `POST /approvals/{id}` la ejecuta con `lb_writer`; todo queda en una tabla de auditoría
+- [x] CLI: `uv run legacybridge ask "..." --profile local-qwen`
+- [x] API FastAPI: `POST /ask`, `GET /approvals`, `POST /approvals/{id}`
 
 **Verificación:** `uv run legacybridge ask "¿Cuántas facturas activas hubo en 2004?" --profile local-qwen` y el mismo comando con `--profile omniroute-free`.
 **DoD:** funciona con `local-qwen` y `omniroute-free` (Bedrock se valida en la Fase 7); las preguntas ambiguas devuelven `needs_clarification`; ninguna escritura ocurre sin aprobación.
+
+**Estado (2026-10-08): parcial.** 562 tests en verde. Cumplido y verificado:
+- **`local-qwen` en vivo (5/5, 52 s)**: la pregunta del plan devuelve **829**, verificada de forma independiente (confianza 0.95, 8 llamadas al modelo, ~28 s); una pregunta ambigua devuelve `needs_clarification`; dos fuera de alcance devuelven `abstained`; una petición de escritura queda `pending_approval` (verificada, 3 de 3 corridas) sin tocar ningún dato de negocio.
+- **Ninguna escritura sin aprobación**, de forma estructural y probada: una consulta de lectura ni siquiera ve `propose_write`; el agente no tiene ninguna ruta de aprobación (ni tool ni endpoint); aprobar es una sola transacción con `lb_writer` que revalida contra la política, recuenta las filas y rechaza datos obsoletos; la auditoría la escribe un trigger y es de solo anexar incluso para el dueño de la tabla.
+- La API y la CLI para revisar solicitudes (`POST /approvals/{id}` con token que falla cerrado; `legacybridge approvals ...`).
+
+**Pendiente:**
+- **`omniroute-free` sin validar en vivo.** Está implementado y probado con transporte simulado (concurrencia 1 medida, reintentos con `Retry-After`, backoff, respuesta vacía, perfil limitado a datos sintéticos), pero `OMNIROUTE_API_KEY` sigue siendo `changeme` en `~/legacybridge-v2/.env`, así que no pude llamar al servicio ni comprobar que el combo `auto/best-free` soporte tool calling. Con la clave: `LB_RUN_LLM_TESTS=1 LB_LIVE_PROFILES=omniroute-free uv run pytest tests/test_live.py -q`.
+- Esto mide **capacidad**, no tasa de aciertos: 5 casos no son una evaluación. La exactitud real, el SWAR rate y la comparación entre perfiles son de la Fase 6.
+
+**Hallazgo de la validación en vivo (corregido):** Qwen devolvió una respuesta vacía justo después de que `propose_write` tuviera éxito y el agente se abstuvo con `llm_error` **perdiendo el `request_id`** de una solicitud que sí existía en la cola. Ahora una solicitud encolada termina el bucle de escritura sin pedirle nada más al modelo, un fallo del modelo no descarta lo que las herramientas ya hicieron, y una respuesta vacía se reintenta con otra muestra (a temperatura 0 el mismo pedido repite el vacío) y se describe con su `finish_reason`. El vacío no se repitió después, así que no afirmo que desapareció; afirmo que ya no puede perder una solicitud.
+
 
 ---
 
