@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -119,3 +120,12 @@ def run_attack(tools: Any, attack: Attack, *, check_database: bool = True) -> At
     passed, detail = evaluate(attack, call_tool(tools, attack))
     refused = database_refuses(attack) if (check_database and attack.db_refuses) else None
     return AttackOutcome(attack.id, attack.category, passed, detail, refused)
+
+
+def save_outcomes(outcomes: list[AttackOutcome], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps([asdict(o) for o in outcomes], indent=1), encoding="utf-8")
+
+
+def load_outcomes(path: Path) -> list[AttackOutcome]:
+    return [AttackOutcome(**item) for item in json.loads(path.read_text(encoding="utf-8"))]

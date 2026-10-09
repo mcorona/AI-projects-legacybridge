@@ -22,7 +22,7 @@ from legacybridge.agent.factory import open_agent
 from legacybridge.agent.orchestrator import Agent
 from legacybridge.agent.schemas import AgentConfig, AgentResult
 from legacybridge.db import connect
-from legacybridge.llm.base import LLMResponse, Message, ToolCall, ToolSpec
+from legacybridge.llm.base import LLMClient, LLMResponse, Message, ToolCall, ToolSpec
 from legacybridge.mcp_server.tools import LegacyTools
 
 ROOT = Path(__file__).resolve().parent
@@ -121,6 +121,7 @@ async def run_golden(
     backend: str = "local",
     action: str = "annotate",
     escalation_profile: str | None = None,
+    llm: LLMClient | None = None,
     log: Callable[[str], None] = print,
 ) -> list[Record]:
     """Ask every case, label the answer, store it. Cases already in ``out`` are skipped."""
@@ -138,6 +139,7 @@ async def run_golden(
         profile,
         backend=backend,
         config=arm_config(arm, action),
+        llm=llm,
         escalation_profile=escalation_profile,
     ) as agent:
         with connect("reader", autocommit=True) as reader:
