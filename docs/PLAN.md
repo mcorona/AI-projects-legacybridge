@@ -196,18 +196,22 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 ### Fase 3 — Capa semántica / ontología (Semana 2–3)
 **Objetivo:** el conocimiento de dominio vive en datos versionados, no en el prompt.
 
-- [ ] `semantic/ontology.yaml` con:
-  - **Entidades** (Cliente, Factura, Producto, Movimiento de inventario) mapeadas a tablas y columnas
-  - **Sinónimos** del negocio ("ventas" = facturación sin canceladas)
-  - **Joins válidos** (grafo de relaciones permitidas)
-  - **Reglas de defectos** (ID → predicado SQL obligatorio o advertencia)
-  - **Métricas canónicas** (p. ej. `ventas_netas`, con su definición SQL)
-- [ ] `defect_rules.py`: dado un SQL, detecta qué reglas aplican y si se cumplieron, y devuelve `violations[]`
-- [ ] `explain_business_term` responde desde la ontología (y desde la KB de Bedrock en la Fase 7)
-- [ ] 👤 Revisar la ontología: es el activo de dominio más valioso del proyecto
+- [x] ADR-006: la capa semántica es un YAML versionado que además comprueba la SQL; las reglas avisan, no bloquean
+- [x] `semantic/ontology.yaml` con:
+  - [x] **Entidades**: 8 (cliente, factura, producto, artículo, almacén, existencia, movimiento, proveedor) mapeadas a tablas, llaves y columnas por rol
+  - [x] **Sinónimos** del negocio ("ventas" = facturación sin canceladas): 16 términos en español e inglés
+  - [x] **Joins válidos**: 9 aristas con su `ON` exacto, incluida la normalización de folios (FAC-01) y el mapeo `AR…` ↔ `P…` (SIC-01)
+  - [x] **Reglas de defectos**: una por cada uno de los 28 defectos, con ejemplos `bad_sql`/`good_sql` que son sus propios tests
+  - [x] **Métricas canónicas**: 7 (`facturas_vigentes`, `facturacion_total`, `ventas_netas`, `clientes_activos`, `unidades_vendidas`, `existencia_actual`, `movimientos_netos`), con SQL parametrizado
+- [x] `defect_rules.py`: dado un SQL, detecta qué reglas aplican y si se cumplieron, y devuelve `violations[]` (16 tipos de chequeo sobre el AST con seguimiento de columnas a través de CTE; 2 de datos sobre las celdas del resultado)
+- [x] `explain_business_term` responde desde la ontología: métricas (con su SQL), términos, entidades, defectos y joins; `describe_table` agrega la entidad y sus joins (la KB de Bedrock llega en la Fase 7)
+- [ ] 👤 Revisar la ontología: es el activo de dominio más valioso del proyecto. Para eso se genera `docs/ontology.md` (`uv run python -m scripts.render_ontology`)
 
 **Verificación:** `uv run pytest tests/test_semantic.py`, donde cada defecto del catálogo tiene al menos un test que detecta su violación.
 **DoD:** `run_query` devuelve `warnings` cuando un SQL viola una regla de defecto.
+
+**Estado (2026-10-08): técnicamente cumplida, falta tu revisión 👤.** 452 tests en verde. Medido sobre el golden set (borrador): **recall 18/18** en los traps detectables por SQL (la consulta ingenua dispara un defecto de su etiqueta; los 2 traps de FAC-10 se detectan en los datos), **especificidad 20/20** (la consulta de referencia no dispara ninguno de sus defectos) y **ruido 8/35** casos neutrales marcados, cada uno explicado en `tests/test_semantic.py`. Las métricas se ejecutan sin avisos y tres coinciden con resultados del golden set (TRAP-002, TRAP-004, TRAP-014). `run_query` ahora devuelve `violations` y `defects_touched`; los avisos pasivos por columna se quitaron (siguen en `describe_table`).
+**Límites:** las reglas son heurísticas y solo avisan; las reglas SIC se prueban únicamente con ejemplos míos porque el golden set no tiene casos de inventario; las definiciones de las métricas (p. ej. `ventas_netas` = subtotal sin IVA de facturas vigentes, por moneda) son decisiones mías que debes confirmar.
 
 ---
 
