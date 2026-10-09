@@ -27,6 +27,13 @@ OPS_FILE = "04_ops.sql"
 ROLE_VARIABLES = {"reader_pw": "reader", "writer_pw": "writer", "proposer_pw": "proposer"}
 SEED = 42
 
+# The marker that ADR-010 reads (``lb.synthetic``). On RDS the master user is not a superuser and
+# the service may refuse a custom setting on the database, so it is applied apart, with a fallback
+# to the role that the check connects as. The line is cut out of 04_ops.sql, which stays the one
+# definition.
+MARKER_SQL = "ALTER DATABASE legacy SET lb.synthetic = 'true';"
+MARKER_FALLBACK_SQL = "ALTER ROLE lb_reader SET lb.synthetic = 'true';"
+
 
 def roles_sql(passwords: Mapping[str, str], path: Path | None = None) -> str:
     """The SQL of ``03_roles.sh`` with each ``:'x_pw'`` psql variable replaced by a quoted literal.
@@ -42,6 +49,21 @@ def roles_sql(passwords: Mapping[str, str], path: Path | None = None) -> str:
         return sql.Literal(passwords[role]).as_string(None)
 
     return re.sub(r":'(\w+_pw)'", fill, body)
+
+
+def set_marker(conn: Any) -> str:
+    """Mark the database as synthetic. Returns where it was set: ``database``, ``role`` (the
+    reader, which is who ADR-010's check connects as) or ``none`` when neither is allowed."""
+    for where, statement in (("database", MARKER_SQL), ("role", MARKER_FALLBACK_SQL)):
+        conn.execute("SAVEPOINT synthetic_marker")
+        try:
+            conn.execute(statement)
+        except psycopg.errors.InsufficientPrivilege:
+            conn.execute("ROLLBACK TO SAVEPOINT synthetic_marker")
+            continue
+        conn.execute("RELEASE SAVEPOINT synthetic_marker")
+        return where
+    return "none"
 
 
 def initialized(conn: Any) -> bool:
@@ -68,10 +90,14 @@ def run(
     for name in SCHEMA_FILES:
         conn.execute((INIT_DIR / name).read_text(encoding="utf-8"))
     conn.execute(roles_sql(passwords))
-    conn.execute((INIT_DIR / OPS_FILE).read_text(encoding="utf-8"))
+    ops = (INIT_DIR / OPS_FILE).read_text(encoding="utf-8")
+    if MARKER_SQL not in ops:
+        raise RuntimeError(f"{OPS_FILE} no longer contains the synthetic marker statement")
+    conn.execute(ops.replace(MARKER_SQL, ""))
+    marker = set_marker(conn)
     conn.commit()
     seeder(seed, conn)
-    return {"status": "initialized"}
+    return {"status": "initialized", "synthetic_marker": marker}
 
 
 def handler(event: dict[str, Any], context: Any = None) -> dict[str, str]:

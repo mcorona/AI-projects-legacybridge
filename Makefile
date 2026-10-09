@@ -62,8 +62,11 @@ synth:
 bootstrap:
 	$(CDK) bootstrap
 
+# APPROVAL=never skips the interactive IAM review (for a shell without a terminal).
+APPROVAL ?= broadening
+
 deploy:
-	$(CDK) deploy --require-approval broadening --outputs-file cdk-outputs.json
+	$(CDK) deploy --require-approval $(APPROVAL) --outputs-file cdk-outputs.json
 	AWS_PROFILE=$(AWS_PROFILE) uv run python -m scripts.aws_post_deploy
 
 destroy:
