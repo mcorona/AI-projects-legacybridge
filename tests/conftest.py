@@ -39,3 +39,12 @@ def admin(db_available):
     with connect("admin") as conn:
         yield conn
         conn.rollback()
+
+
+@pytest.fixture(scope="session")
+def tools(db_available):
+    from legacybridge.mcp_server.tools import LegacyTools
+
+    if not db_available:
+        pytest.skip("legacy Postgres is not reachable (make db-up && make seed)")
+    return LegacyTools()
