@@ -1,4 +1,4 @@
-.PHONY: db-up db-reset seed test lint obs-up obs-down
+.PHONY: db-up db-reset seed test lint obs-up obs-down eval eval-gate eval-report
 
 # Starts Postgres (creates .env from .env.example on first run) and waits until it is healthy.
 db-up:
@@ -30,3 +30,19 @@ obs-up:
 
 obs-down:
 	docker compose --profile obs stop phoenix otel-collector
+
+# ---- evaluation (Phase 6, ADR-013). RUN_ID names the result files; reuse one to resume a run.
+RUN_ID ?= $(shell date -u +%Y%m%d)
+
+# What CI runs. No model needed (it does not measure any); about 15 s.
+eval-gate: db-up
+	uv run python -m evals.gate
+
+# The whole evaluation: takes hours. The golden cases need LM Studio and an OmniRoute key.
+eval: db-up
+	uv run python -m evals.run_evals --profiles local-qwen,omniroute-free --set golden,attacks --run-id $(RUN_ID)
+	uv run python -m evals.run_evals --profiles local-qwen --arm no-verify,no-semantic --set golden --run-id $(RUN_ID)
+	uv run --group eval python -m evals.report --run-id $(RUN_ID) --docs
+
+eval-report:
+	uv run --group eval python -m evals.report --run-id $(RUN_ID) --docs

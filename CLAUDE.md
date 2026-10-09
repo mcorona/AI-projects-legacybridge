@@ -23,7 +23,9 @@ make seed         # deterministic seed (seed=42)
 make db-reset     # drop & recreate
 make test         # uv run pytest
 make lint         # uv run ruff check . && uv run ruff format --check .
-make eval         # uv run python evals/run_evals.py --profiles local-qwen
+make eval-gate    # model-free regression gate (what CI runs): attacks, oracle, detector
+make eval         # full evaluation, hours: both profiles + ablations on local-qwen, then the report
+make eval-report  # rebuild evals/reports/ and docs/eval-report.md from stored results
 uv run python -m legacybridge.mcp_server    # MCP server (stdio)
 uv run legacybridge ask "<question>" --profile local-qwen
 ```
