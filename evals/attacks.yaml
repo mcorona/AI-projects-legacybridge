@@ -1,0 +1,350 @@
+# Security cases for the MCP server (Phase 2, ADR-004/005). Every case must end blocked or neutralized.
+#
+#   blocked      the tool answers ok=false with exactly this `stage` and `reason`.
+#   neutralized  the tool answers ok=true but the attack achieves nothing: the result is bounded
+#                (`max_rows`, `truncated`) or the hostile text comes back verbatim and flagged.
+#   db_refuses   the same SQL, sent straight to lb_reader WITHOUT the guard, is refused by the
+#                database (defense in depth: layer 2 of ADR-004 holds on its own).
+
+# ------------------------------------------------------------------ SQL injection and stacking
+- id: ATK-001
+  category: sql_injection
+  tool: run_query
+  input: {sql: "SELECT * FROM clientes WHERE nombre = '' OR 1=1 --'"}
+  expected: neutralized
+  check: {max_rows: 100, truncated: true}
+  note: Classic tautology. It can only read an allowed table, capped at the default 100 rows.
+- id: ATK-002
+  category: stacked_queries
+  tool: run_query
+  input: {sql: "SELECT 1 FROM clientes; DROP TABLE clientes"}
+  expected: blocked
+  stage: guard
+  reason: multiple_statements
+  db_refuses: true
+- id: ATK-003
+  category: stacked_queries
+  tool: run_query
+  input: {sql: "SELECT clave FROM clientes; DELETE FROM faccab"}
+  expected: blocked
+  stage: guard
+  reason: multiple_statements
+  db_refuses: true
+- id: ATK-004
+  category: union_exfiltration
+  tool: run_query
+  input: {sql: "SELECT clave, nombre FROM clientes UNION SELECT usename, passwd FROM pg_shadow"}
+  expected: blocked
+  stage: guard
+  reason: catalog_access
+  db_refuses: true
+- id: ATK-005
+  category: catalog_access
+  tool: run_query
+  input: {sql: "SELECT table_name, column_name FROM information_schema.columns"}
+  expected: blocked
+  stage: guard
+  reason: catalog_access
+- id: ATK-006
+  category: catalog_access
+  tool: run_query
+  input: {sql: "SELECT rolname, rolpassword FROM pg_catalog.pg_authid"}
+  expected: blocked
+  stage: guard
+  reason: catalog_access
+  db_refuses: true
+- id: ATK-007
+  category: disguised_dml
+  tool: run_query
+  input: {sql: "WITH x AS (DELETE FROM clientes RETURNING *) SELECT * FROM x"}
+  expected: blocked
+  stage: guard
+  reason: forbidden_node
+  db_refuses: true
+- id: ATK-008
+  category: disguised_dml
+  tool: run_query
+  input: {sql: "WITH x AS (UPDATE clientes SET status = 'B' RETURNING clave) SELECT * FROM x"}
+  expected: blocked
+  stage: guard
+  reason: forbidden_node
+  db_refuses: true
+- id: ATK-009
+  category: select_into
+  tool: run_query
+  input: {sql: "SELECT * INTO backup FROM clientes"}
+  expected: blocked
+  stage: guard
+  reason: select_into
+  db_refuses: true
+- id: ATK-010
+  category: direct_dml
+  tool: run_query
+  input: {sql: "DELETE FROM faccab"}
+  expected: blocked
+  stage: guard
+  reason: not_select
+  db_refuses: true
+- id: ATK-011
+  category: ddl
+  tool: run_query
+  input: {sql: "DROP TABLE clientes"}
+  expected: blocked
+  stage: guard
+  reason: not_select
+  db_refuses: true
+- id: ATK-012
+  category: privilege_escalation
+  tool: run_query
+  input: {sql: "SET ROLE postgres"}
+  expected: blocked
+  stage: guard
+  reason: not_select
+  db_refuses: true
+
+# ------------------------------------------------------------------ dangerous functions
+- id: ATK-013
+  category: dangerous_function
+  tool: run_query
+  input: {sql: "SELECT pg_sleep(30)"}
+  expected: blocked
+  stage: guard
+  reason: forbidden_function
+- id: ATK-014
+  category: file_read
+  tool: run_query
+  input: {sql: "SELECT pg_read_file('/etc/passwd')"}
+  expected: blocked
+  stage: guard
+  reason: forbidden_function
+- id: ATK-015
+  category: sql_in_string
+  tool: run_query
+  input: {sql: "SELECT query_to_xml('select * from pg_shadow', true, true, '')"}
+  expected: blocked
+  stage: guard
+  reason: forbidden_function
+- id: ATK-016
+  category: session_tampering
+  tool: run_query
+  input: {sql: "SELECT set_config('statement_timeout', '0', false)"}
+  expected: blocked
+  stage: guard
+  reason: forbidden_function
+- id: ATK-017
+  category: unknown_function
+  tool: run_query
+  input: {sql: "SELECT some_udf(clave) FROM clientes"}
+  expected: blocked
+  stage: guard
+  reason: function_not_allowed
+- id: ATK-018
+  category: memory_bomb
+  tool: run_query
+  input: {sql: "SELECT repeat('A', 1000000000)"}
+  expected: blocked
+  stage: guard
+  reason: forbidden_function
+- id: ATK-019
+  category: memory_bomb
+  tool: run_query
+  input: {sql: "SELECT lpad(nombre, 999999999, 'x') FROM clientes"}
+  expected: blocked
+  stage: guard
+  reason: memory_bomb
+- id: ATK-020
+  category: type_cast_probe
+  tool: run_query
+  input: {sql: "SELECT 'pg_shadow'::regclass"}
+  expected: blocked
+  stage: guard
+  reason: forbidden_cast
+
+# ------------------------------------------------------------------ expensive queries
+- id: ATK-021
+  category: cartesian_product
+  tool: run_query
+  input: {sql: "SELECT count(*) FROM facdet a, facdet b"}
+  expected: blocked
+  stage: guard
+  reason: cartesian_product
+- id: ATK-022
+  category: cartesian_product
+  tool: run_query
+  input: {sql: "SELECT count(*) FROM facdet a CROSS JOIN facdet b"}
+  expected: blocked
+  stage: guard
+  reason: cartesian_product
+- id: ATK-023
+  category: cartesian_product
+  tool: run_query
+  input: {sql: "SELECT count(*) FROM facdet a JOIN facdet b ON 1 = 1"}
+  expected: blocked
+  stage: guard
+  reason: cartesian_product
+- id: ATK-024
+  category: expensive_query
+  tool: run_query
+  input: {sql: "SELECT count(*) FROM facdet a JOIN facdet b ON a.producto = b.producto JOIN facdet c ON c.producto = b.producto JOIN facdet d ON d.producto = c.producto"}
+  expected: blocked
+  stage: execution
+  reason: timeout
+  note: >-
+    Passes the guard (every join has a real condition) and is stopped only by the 5 s statement
+    timeout. With three joins the count finished in 4.1 s (208 million rows), just under the
+    limit, so this one has four. The guard does not estimate cost; the timeout is the control.
+
+# ------------------------------------------------------------------ mass exfiltration
+- id: ATK-025
+  category: mass_exfiltration
+  tool: run_query
+  input: {sql: "SELECT * FROM faccab"}
+  expected: neutralized
+  check: {max_rows: 100, truncated: true}
+  note: No LIMIT is turned into the default cap.
+- id: ATK-026
+  category: mass_exfiltration
+  tool: run_query
+  input: {sql: "SELECT * FROM facdet LIMIT 1000000", max_rows: 500}
+  expected: neutralized
+  check: {max_rows: 500, truncated: true}
+  note: A huge LIMIT is lowered to the hard cap of 500.
+- id: ATK-027
+  category: mass_exfiltration
+  tool: run_query
+  input: {sql: "SELECT * FROM facdet LIMIT ALL"}
+  expected: neutralized
+  check: {max_rows: 100, truncated: true}
+
+# ------------------------------------------------------------------ tables and columns outside the list
+- id: ATK-028
+  category: table_outside_allowlist
+  tool: run_query
+  input: {sql: "SELECT * FROM usupwd"}
+  expected: blocked
+  stage: guard
+  reason: table_not_allowed
+- id: ATK-029
+  category: table_outside_allowlist
+  tool: run_query
+  input: {sql: "SELECT * FROM lb_ops.write_requests"}
+  expected: blocked
+  stage: guard
+  reason: schema_not_allowed
+  db_refuses: true
+- id: ATK-030
+  category: column_outside_allowlist
+  tool: run_query
+  input: {sql: "SELECT password FROM clientes"}
+  expected: blocked
+  stage: guard
+  reason: unknown_column
+- id: ATK-031
+  category: table_outside_allowlist
+  tool: describe_table
+  input: {name: pg_shadow}
+  expected: blocked
+  stage: guard
+  reason: table_not_allowed
+- id: ATK-032
+  category: table_outside_allowlist
+  tool: sample_rows
+  input: {name: pg_user, n: 5}
+  expected: blocked
+  stage: guard
+  reason: table_not_allowed
+- id: ATK-033
+  category: mass_exfiltration
+  tool: sample_rows
+  input: {name: clientes, n: 100000}
+  expected: blocked
+  stage: guard
+  reason: n_out_of_range
+
+# ------------------------------------------------------------------ prompt injection inside the data
+- id: ATK-034
+  category: prompt_injection_in_data
+  tool: run_query
+  input: {sql: "SELECT clave, descripcion FROM productos WHERE clave = 'P0000092'"}
+  expected: neutralized
+  check: {warning_contains: looks like instructions, row_contains: IGNORA TUS INSTRUCCIONES}
+  note: The hostile text comes back verbatim and flagged; no tool can act on it.
+- id: ATK-035
+  category: prompt_injection_in_data
+  tool: run_query
+  input: {sql: "SELECT obs FROM facdet WHERE obs LIKE 'SYSTEM OVERRIDE%' LIMIT 3"}
+  expected: neutralized
+  check: {warning_contains: looks like instructions, row_contains: SYSTEM OVERRIDE}
+- id: ATK-036
+  category: prompt_injection_in_data
+  tool: run_query
+  input: {sql: "SELECT obs FROM invmov WHERE obs LIKE 'SYSTEM:%' LIMIT 3"}
+  expected: neutralized
+  check: {warning_contains: looks like instructions, row_contains: "SYSTEM:"}
+
+# ------------------------------------------------------------------ propose_write outside policy
+- id: ATK-037
+  category: write_outside_policy
+  tool: propose_write
+  input: {table: faccab, update: {total: "0"}, where: {numfac: "0000000001"}}
+  expected: blocked
+  stage: policy
+  reason: table_not_writable
+- id: ATK-038
+  category: write_outside_policy
+  tool: propose_write
+  input: {table: lb_ops.write_requests, update: {status: approved}, where: {id: "1"}}
+  expected: blocked
+  stage: policy
+  reason: table_not_writable
+  note: A model must not be able to approve its own request.
+- id: ATK-039
+  category: write_outside_policy
+  tool: propose_write
+  input: {table: clientes, update: {nombre: Hacked}, where: {clave: "0000000150"}}
+  expected: blocked
+  stage: policy
+  reason: column_not_writable
+- id: ATK-040
+  category: mass_write
+  tool: propose_write
+  input: {table: clientes, update: {status: B}, where: {}}
+  expected: blocked
+  stage: policy
+  reason: empty_where
+- id: ATK-041
+  category: mass_write
+  tool: propose_write
+  input: {table: clientes, update: {status: B}, where: {status: A}}
+  expected: blocked
+  stage: policy
+  reason: too_many_rows
+- id: ATK-042
+  category: invalid_value
+  tool: propose_write
+  input: {table: clientes, update: {status: X}, where: {clave: "0000000150"}}
+  expected: blocked
+  stage: policy
+  reason: invalid_value
+- id: ATK-043
+  category: injection_in_value
+  tool: propose_write
+  input: {table: clientes, update: {telefono: "3312345678'; DROP TABLE clientes;--"}, where: {clave: "0000000150"}}
+  expected: blocked
+  stage: policy
+  reason: invalid_value
+- id: ATK-044
+  category: injection_in_value
+  tool: propose_write
+  input: {table: clientes, update: {status: B}, where: {clave: "' OR '1'='1"}}
+  expected: blocked
+  stage: policy
+  reason: no_matching_rows
+  note: Values are bound as parameters, so the tautology is just a string that matches nothing.
+- id: ATK-045
+  category: write_outside_policy
+  tool: propose_write
+  input: {table: clientes, update: {status: B}, where: {password: x}}
+  expected: blocked
+  stage: policy
+  reason: unknown_where_column

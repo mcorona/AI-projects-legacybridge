@@ -171,20 +171,25 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 ### Fase 2 — MCP server seguro (Semana 2)
 **Objetivo:** cualquier cliente MCP puede explorar y consultar la BD sin poder dañarla.
 
-- [ ] Tools: `list_tables`, `describe_table(name)`, `sample_rows(name, n<=20)`, `run_query(sql)`, `explain_business_term(term)`, `propose_write(change)` (no ejecuta nada; crea una solicitud pendiente)
-- [ ] `sql_guard.py`: parseo AST con `sqlglot`. Solo `SELECT`/`WITH`; sin `;` múltiples; whitelist de tablas y columnas; `LIMIT` forzado (máx. 500); `statement_timeout` de 5 s; bloqueo de funciones peligrosas (`pg_sleep`, `pg_read_file`, `dblink`, …)
-- [ ] Conexión con el rol `lb_reader` (defensa en profundidad: aunque el guard falle, la BD rechaza la escritura)
-- [ ] Resultados con metadatos: `row_count`, `truncated`, `columns`, `warnings` (p. ej. "columna con defecto conocido")
-- [ ] `.mcp.json` para usarlo desde Claude Code:
+- [x] ADR-001 (MCP server propio), ADR-004 (seguridad SQL en 3 capas) y ADR-005 (escrituras = propuestas) antes de codificar
+- [x] Tools (`src/legacybridge/mcp_server/`): `list_tables`, `describe_table(name)`, `sample_rows(name, n<=20)`, `run_query(sql)`, `explain_business_term(term)`, `propose_write(table, update, where)` (no ejecuta nada; crea una solicitud pendiente en `lb_ops.write_requests` con un rol que solo puede INSERT/SELECT ahí)
+- [x] `sql_guard.py`: parseo AST con `sqlglot`. Solo `SELECT`/`WITH`; sin `;` múltiples; whitelist de tablas **y columnas** (= lo que `lb_reader` puede leer, introspectado del catálogo); `LIMIT` forzado (máx. 500); `statement_timeout` de 5 s; funciones desconocidas denegadas por defecto; sin producto cartesiano ni bombas de memoria. Se ejecuta la SQL regenerada desde el AST, nunca el texto original
+- [x] Conexión con el rol `lb_reader` (defensa en profundidad: aunque el guard falle, la BD rechaza la escritura; el ejecutor verifica rol y transacción de solo lectura antes de cada consulta)
+- [x] Resultados con metadatos: `row_count`, `truncated`, `columns`, `warnings` (defectos conocidos de las columnas usadas e instrucciones sospechosas en los datos) y `data_notice`
+- [x] Ontología mínima (`semantic/ontology.yaml`: glosario y defectos por columna) para `explain_business_term` y los `warnings`; la Fase 3 la extiende
+- [x] `.mcp.json` para usarlo desde Claude Code:
   ```json
   { "mcpServers": { "legacybridge": {
       "command": "uv", "args": ["run", "python", "-m", "legacybridge.mcp_server"] } } }
   ```
-- [ ] `evals/attacks.yaml`: **≥15 casos de ataque**: SQL injection, *stacked queries*, prompt injection **dentro de los datos** (un `descripcion` de producto con instrucciones maliciosas), exfiltración masiva, consultas costosas (producto cartesiano)
-- [ ] Tests unitarios del guard (≥30 casos)
+- [x] `evals/attacks.yaml`: **45 casos de ataque** en 26 categorías (38 bloqueados, 7 neutralizados; 11 de ellos se reenvían además a la BD sin guard): SQL injection, *stacked queries*, prompt injection **dentro de los datos** (un `descripcion` de producto con instrucciones maliciosas), exfiltración masiva, consultas costosas (producto cartesiano), escrituras fuera de política
+- [x] Tests unitarios del guard (≥30 casos): 171 con el corpus del golden set
 
 **Verificación:** `uv run pytest tests/test_sql_guard.py tests/test_mcp_tools.py` y, en Claude Code, `/mcp` muestra `legacybridge` conectado.
 **DoD:** el 100 % de los ataques es bloqueado o neutralizado; Claude Code puede responder 5 preguntas del golden set usando solo el MCP server.
+
+**Estado (2026-10-08): técnicamente cumplida, falta tu aprobación 👤.** 393 tests en verde; los 45 ataques se bloquean o neutralizan, y los de escritura también los rechaza la BD sin el guard. Las 5 preguntas del golden set (SIMPLE-001, JOIN-005, TRAP-002, TRAP-006, TRAP-019) se responden por stdio con un cliente MCP y coinciden con sus hashes. `claude mcp list` ve el server pero queda **"Pending approval"**: aprobarlo es decisión tuya (`cd ~/legacybridge-v2 && claude`, aprobar, `/mcp`).
+**Decisiones:** "neutralizar" el prompt injection en datos = devolver el texto íntegro, marcado como no confiable, sin que ninguna tool pueda actuar por él; el guard no estima costo (una consulta cara pasa y la detiene el timeout de 5 s).
 
 ---
 
