@@ -1,0 +1,26 @@
+# OpenTelemetry Collector for local development (ADR-007).
+# The app exports OTLP/HTTP to this Collector; the Collector forwards to Phoenix. In AWS (Phase 7)
+# only this file changes (the ADOT / CloudWatch exporters), not the application code.
+receivers:
+  otlp:
+    protocols:
+      grpc: {endpoint: 0.0.0.0:4317}
+      http: {endpoint: 0.0.0.0:4318}
+
+processors:
+  batch: {}
+  # Prompts, SQL and rows only reach spans when LB_TRACE_CONTENT=1. This is the place to redact
+  # them before export when real data is involved.
+
+exporters:
+  otlphttp/phoenix:
+    endpoint: http://phoenix:6006     # the exporter appends /v1/traces
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/phoenix, debug]

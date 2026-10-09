@@ -21,5 +21,33 @@ services:
       timeout: 3s
       retries: 20
 
+  # --- observability (ADR-007): `make obs-up`. Behind a profile so `make db-up` stays fast.
+  phoenix:
+    profiles: ["obs"]
+    image: arizephoenix/phoenix:version-20.20.0
+    container_name: legacybridge2-phoenix
+    environment:
+      PHOENIX_WORKING_DIR: /mnt/data
+    volumes:
+      - phoenixdata:/mnt/data
+    ports:
+      # UI and OTLP/HTTP. Loopback only. 4317 is not published here: the Collector owns it.
+      - "127.0.0.1:6006:6006"
+    # no healthcheck: the image has no shell (distroless); `make obs-up` polls /healthz from the host
+
+  otel-collector:
+    profiles: ["obs"]
+    image: otel/opentelemetry-collector-contrib:0.162.0
+    container_name: legacybridge2-otel
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel/collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    depends_on:
+      - phoenix
+
 volumes:
   lbdata2:
+  phoenixdata:
