@@ -26,6 +26,7 @@ UNITS = {
     "Answered": "Count",
     "GuardrailIntervened": "Count",
     "GuardrailBlocked": "Count",
+    "GuardrailErrors": "Count",
 }
 
 
@@ -49,8 +50,12 @@ def metrics_for(
         "LlmCalls": result.usage.llm_calls,
         "CostUsd": round(cost_usd(result, price_in, price_out), 6),
         "SwarRisk": result.swar_risk,
-        "GuardrailIntervened": 1 if guard and guard.action else 0,
+        # an error is not an intervention: the guard did not judge anything, and the agent closed
+        "GuardrailIntervened": 1
+        if guard and guard.action in ("blocked_input", "blocked_output", "masked")
+        else 0,
         "GuardrailBlocked": 1 if guard and (guard.action or "").startswith("blocked") else 0,
+        "GuardrailErrors": 1 if guard and guard.action == "error" else 0,
     }
     return values
 

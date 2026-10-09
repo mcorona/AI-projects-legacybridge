@@ -355,3 +355,14 @@ def test_the_lambda_entry_point_builds_the_app_from_the_environment_once(monkeyp
     assert front.handler(http_event("GET", "/health", token=None))["statusCode"] == 200
     assert front.handler(http_event("GET", "/health", token=None))["statusCode"] == 200
     assert built == [1]
+
+
+def test_a_guardrail_that_failed_is_an_error_not_an_intervention():
+    failed = emf.metrics_for(result(status="abstained", guardrail=GuardrailRecord(action="error")))
+    assert (
+        failed["GuardrailIntervened"],
+        failed["GuardrailBlocked"],
+        failed["GuardrailErrors"],
+    ) == (0, 0, 1)
+    masked = emf.metrics_for(result(guardrail=GuardrailRecord(action="masked")))
+    assert masked["GuardrailErrors"] == 0 and emf.metrics_for(result())["GuardrailErrors"] == 0

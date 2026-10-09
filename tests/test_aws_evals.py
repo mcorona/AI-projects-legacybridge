@@ -203,3 +203,19 @@ def test_the_knowledge_command_refuses_to_run_without_a_knowledge_base(monkeypat
     monkeypatch.setattr("legacybridge.env.load_env", lambda: None)
     assert kb_eval.main(["--run-id", "x"]) == 1
     assert "LB_KB_ID" in capsys.readouterr().err
+
+
+def test_the_report_says_how_well_a_retriever_that_ignores_the_query_would_do():
+    queries = [{"id": f"K{i}", "query": f"q{i}", "acceptable": ["ontology.md", "other.md"] if i < 4 else ["other.md"]}
+               for i in range(5)]  # fmt: skip
+    results = kb_eval.measure(ScriptedKb({f"q{i}": ["other.md"] for i in range(5)}), queries)
+    assert kb_eval.trivial_baseline(results) == ("other.md", 5)
+    text = kb_eval.render(results, "t1")
+    assert "always answered with `other.md` would hit 5 of 5" in text
+    assert "cannot tell a good retriever from a trivial one" in text
+
+
+def test_the_committed_knowledge_probes_are_all_answerable_by_one_document():
+    """Documented, not hidden: that is why the report prints the baseline next to the hit rate."""
+    results = [{"id": q["id"], "acceptable": q["acceptable"]} for q in kb_eval.load_queries()]
+    assert kb_eval.trivial_baseline(results) == ("ontology.md", 20)
