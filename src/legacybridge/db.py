@@ -8,12 +8,11 @@ queue write requests). DSNs come from the environment or from ``.env``; nothing 
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import psycopg
-from dotenv import find_dotenv, load_dotenv
 
-REPO_ENV = Path(__file__).resolve().parents[2] / ".env"
+from legacybridge.env import REPO_ENV, load_env  # noqa: F401
+
 ENV_VARS = {
     "admin": "LB_ADMIN_DSN",
     "reader": "LB_READER_DSN",
@@ -24,8 +23,7 @@ ENV_VARS = {
 
 def dsn(role: str) -> str:
     """Return the DSN for ``role``; load ``.env`` first without overriding the environment."""
-    # The cwd of an MCP client is not always the repo root, so fall back to the repo's own .env.
-    load_dotenv(find_dotenv(usecwd=True) or REPO_ENV, override=False)
+    load_env()
     var = ENV_VARS[role]
     value = os.environ.get(var)
     if not value:

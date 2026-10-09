@@ -1,0 +1,26 @@
+# Runtime model profiles (ADR-003). Addresses, model names and keys come from environment
+# variables (see .env.example); everything else about a profile lives here.
+# bedrock-claude is added in Phase 7.
+profiles:
+  local-qwen:                  # LM Studio, Qwen3.6-35B-A3B
+    kind: openai_compat
+    base_url_env: LMSTUDIO_BASE_URL      # http://localhost:1234/v1
+    model_env: LMSTUDIO_MODEL
+    max_tokens: 6144           # Qwen thinks before it answers; a small budget returns nothing
+    temperature: 0
+    timeout_s: 900
+    max_concurrency: 1         # one local GPU
+    retries: 2
+    backoff_base_s: 1
+  omniroute-free:              # free-tier model combo behind OmniRoute (ADR-010)
+    kind: openai_compat
+    base_url_env: OMNIROUTE_BASE_URL     # http://localhost:20128/v1
+    api_key_env: OMNIROUTE_API_KEY
+    model_env: OMNIROUTE_MODEL           # a combo that supports tool calling
+    max_tokens: 4096
+    temperature: 0
+    timeout_s: 240
+    max_concurrency: 1         # free tiers rate-limit
+    retries: 3
+    backoff_base_s: 2
+    synthetic_data_only: true  # refuses to start against a database not marked synthetic

@@ -48,3 +48,8 @@ def tools(db_available):
     if not db_available:
         pytest.skip("legacy Postgres is not reachable (make db-up && make seed)")
     return LegacyTools()
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"

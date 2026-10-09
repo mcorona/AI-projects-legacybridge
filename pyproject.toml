@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "boto3>=1.43.110",
     "fastapi>=0.143.0",
+    "httpx2[http2]>=2.13.1",
     "mcp>=2.3.0",
     "openai>=3.26.1",
     "opentelemetry-exporter-otlp>=1.45.1",
@@ -41,6 +42,9 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]  # long SQL and payloads are clearer unwrapped
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
