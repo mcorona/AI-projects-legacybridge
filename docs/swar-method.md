@@ -72,24 +72,35 @@ uv run python -m evals.swar_eval live --profile local-qwen     # the 20 cases, l
 
 ## What the numbers do and do not say
 
-The baseline (static signals, 68 delivered answers, 13 silently wrong) gives precision 0.60 and
-recall 0.92 at threshold 0.3 or 0.5, and flags nothing at the action threshold. Read that as: the
-rules recognise most of the wrong answers they were designed to recognise, are wrong about one in
-three of what they flag, and by construction cannot make the agent act on their own.
+Three measurements, in `evals/reports/` and summarised in ADR-012:
+
+- **Baseline with no LLM** (static signals, 68 delivered answers, 13 silently wrong): precision 0.60
+  and recall 0.92 at 0.3 or 0.5, and nothing flagged at the action threshold. The rules recognise most
+  of what they were built to recognise and are wrong about two in five of what they flag.
+- **Live, local Qwen and `omniroute-free`, 20 fixed cases each**: 27 delivered answers, 5 silently
+  wrong. The static rules saw none of the five. At 0.5 the detector flagged 3 of 5 (recall 3/5,
+  precision 3/6); at the action threshold 2 of 5. What caught them was the verifier.
+- **Two wrong answers nothing caught**: the writer and the verifier shared the same wrong reading of
+  a question. That is the SWAR this method does not see, and the one a second, independent reading
+  would address.
+
+**The early warning did not act on any of 40 real runs.** C2 flagged none of the wrong answers
+before the verifier ran, and C1 was reached in 5 runs and never crossed the threshold. The mechanism
+is verified by scripted tests, not yet by a real case, and this sample does not support the claim that
+the first spans already tell you the answer will be wrong.
 
 Limits, stated plainly:
 
 - **Circularity.** The rules, the traps, the metrics and the defect catalogue come from the same
   author. Recall on the rule signals holds *by construction*; it is not evidence that the detector
   finds errors it was not built to find. The verifier's briefing also includes the rule warnings.
-- **Blind spots.** One wrong answer in the baseline (TRAP-009) raises no rule signal at all. Only the
-  dynamic signals can catch errors the rules do not know, and the report lists those separately.
-- **Small samples.** Twenty live cases yield few positives; the intervals are wide and a point value
-  should not be quoted.
+- **Tiny samples.** Two, three and five positives. The intervals span most of the range; quote none.
+- **Corrected after the fact.** Five definition errors (four in the detector and its rules, one in the
+  labels) were fixed after seeing results. None changed a weight or a threshold. The relabelled cases
+  all moved toward "correct"; the reports keep the as-run figures next to the corrected ones.
 - **Draft labels.** The golden set is still `review: draft`.
-- **Priors, not fits.** The weights were written down before measuring and are not fitted to the
-  results. Three definition errors were fixed after the first baseline; none was a weight change
-  (see the change log in ADR-012).
+- **Priors, not fits.** Weights and thresholds were written down before measuring.
+- **Models change.** A free-tier result describes that model on that day (ADR-010).
 
 ## 👤 Connection to your thesis
 

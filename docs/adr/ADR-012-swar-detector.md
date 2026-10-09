@@ -108,40 +108,66 @@ These fixes were motivated by golden cases, which is why the 20-case subset was 
 before the baseline ran, and why none of the cases that exposed them (JOIN-001, TRAP-007, TRAP-020)
 belongs to it, except TRAP-019, whose behaviour follows from fix 2 and not from its label.
 
-## Changes after the first live run (2026-10-09)
+## Changes after the first live runs (2026-10-09)
 
-The first live run (local Qwen, the fixed 20-case subset) exposed a fourth definition error:
+Two live runs on the fixed 20-case subset (local Qwen and, with a single free model,
+`omniroute-free`) exposed two more definition errors, one in the detector and one in the labels:
 
 4. **A verdict was treated as speaking for the final answer when it judged an earlier attempt.** The
    verifier disagreed with attempt 0, the writer retried, the retry got no verdict, and the run was
-   scored `verifier_disagreed_final`. A verdict now only counts for the attempt it judged; an
-   unjudged final answer is `unverified`, with an earlier disagreement recorded as
-   `verifier_disagreed_retried`.
+   scored `verifier_disagreed_final`. A verdict now counts only for the attempt it judged; an
+   unjudged final answer is `unverified`, and an earlier disagreement is `verifier_disagreed_retried`.
+5. **The labels punished differences of presentation.** The same rows in another order, when the
+   expected query sorts but does not `LIMIT`, and a single expected figure inside a wider result,
+   were labelled silently wrong. Both are now accepted, the second only when the figure sits in
+   exactly one row **that carries a label** and the answer states it. The first version of that
+   second rule was too loose: it accepted TRAP-015's naive query, which returns both captures of an
+   invoice in one unlabelled column. The baseline test caught it before it was published.
 
-Because the detector is a pure function of what a result stores, the stored runs were **rescored**
-with the corrected detector, and the report shows both versions. This does not make the rescored
-numbers an independent test: the defect was seen in those very runs. In fact the fix moved one case
-(TRAP-006, 0.98 to 0.92) and **no cell of the confusion tables**; that case stays "high" because its
-trajectory really was erratic (repeated calls, a cascade of failures) although its final answer was
-right. That is a false alarm of a detector that scores the run and not only the answer, and it is
-reported as one.
+Because the detector and the labels are functions of what a result stores, the stored runs were
+**rescored and relabelled**, and every report shows both versions ("As it ran"). That is not an
+independent test: the defects were seen in those very runs, and **all three relabelled cases moved
+from silently wrong to correct**, so the corrections made the agent look better, not the detector.
 
-## What the first live run says about the early warning
-
-Local Qwen, 20 cases, 13 delivered answers of which 3 were silently wrong (a different result set,
-two of them after a writer retry and a verifier disagreement; one that mentions figures that are not
-in its evidence). None of the three was visible to the static rules.
-
-| | silently wrong flagged | correct flagged |
+| | as it ran | relabelled |
 |---|---|---|
-| risk >= 0.5, final | 3/3 | 2/10 |
-| risk >= 0.7 (action threshold), final | 1/3 | 1/10 |
-| risk >= 0.7 at **C2**, before the verifier | **0/3** | 0/10 |
+| local Qwen, silently wrong | 3 of 13 delivered answers | 2 of 13 (SIMPLE-013: same rows, other order) |
+| omniroute-free, silently wrong | 5 of 14 | 3 of 14 (JOIN-014 order; TRAP-013 labelled row) |
 
-So, on this sample, **the early warning would not have caught any of the three wrong answers before
-the verifier ran**. The writer produced them cleanly; what exposed them was the verifier disagreeing,
-or flailing. The claim that a risk computed from the first spans is informative is **not supported
-here**. What the checkpoints can still do is stop a stuck loop and spare model calls (C1), which this
-sample did not exercise. Whether `gate` improves the SWAR rate is the Phase 6 ablation; this phase
-only shows that the detector, with the verifier's verdict, separates most wrong answers (recall 3/3 at
-0.5), at a cost of two false alarms in ten correct answers.
+## What the first live runs say
+
+Final risk, 27 delivered answers (13 local Qwen, 14 omniroute-free), **5 silently wrong**. The two
+models are different, so the pooled line is a description, not an estimate for either.
+
+| | local Qwen (2 wrong) | omniroute-free (3 wrong) | pooled (5 wrong) |
+|---|---|---|---|
+| risk >= 0.3 | recall 2/2, precision 2/6 | recall 1/3, precision 1/2 | recall 3/5, precision 3/8 |
+| risk >= 0.5 | recall 2/2, precision 2/5 | recall 1/3, precision 1/1 | recall 3/5, precision 3/6 |
+| risk >= 0.7 (action) | recall 1/2, precision 1/2 | recall 1/3, precision 1/1 | recall 2/5, precision 2/3 |
+
+With 2, 3 and 5 positives these are not estimates: the 95% intervals in the reports span most of the
+range. What they support:
+
+- **The static rules saw none of the five.** All five wrong answers raised no rule signal. The rules
+  are what the traps were built from, and these errors are of a different kind (see below).
+- **What caught the wrong answers was the verifier, not the rules.** TRAP-008 (0.91) and WRITE-008
+  (0.90, the verifier noticed that the request touched 1 of 2 rows) were flagged by
+  `verifier_disagreed_*` and trajectory signals. JOIN-005 on Qwen reached 0.55 after a retry.
+- **Two wrong answers were invisible to everything.** On `omniroute-free`, JOIN-005 (240 instead of
+  241) and JOIN-009 (2 instead of 1) both added `faccab.status = 'V'`, a filter the question did not
+  ask for. The verifier **agreed** with the same reading and no signal fired. This is the SWAR the
+  detector cannot see: the writer and the verifier share a wrong interpretation.
+- **False alarms** are mostly erratic-but-right trajectories (TRAP-006 on Qwen: repeated calls and a
+  failure cascade, correct answer, risk 0.92 after the verifier's disagreement on a retry).
+
+### The early warning did not act on any real run
+
+C2 (before the verifier) flagged **0 of 5** wrong answers and 0 of 25 right ones. C1 was reached in
+only 5 of 40 runs (the writer rarely makes six tool calls) and in none did the trajectory risk reach
+the action threshold. So **with these priors, `gate` and `annotate` would have behaved identically on
+all 40 runs**: the early warning is verified only by the scripted tests (`tests/test_swar.py`), which
+exercise every action, and not by a real run. The claim that a risk computed from the first spans is
+informative is **not supported** by this sample; what the data shows is that the verifier's verdict
+is what separates most of the wrong answers that can be separated. Whether `gate` pays for itself,
+whether lower thresholds would, and what an independent second reading of the question would add
+(the case of JOIN-005 and JOIN-009) are questions for Phase 6, which has the sample size to ask them.

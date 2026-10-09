@@ -1,9 +1,9 @@
 # SWAR detector measurement: local-qwen
 
-Generated 2026-10-09 05:37 UTC by `evals/swar_eval.py`. Method and limits: `docs/adr/ADR-012-swar-detector.md`.
+Generated 2026-10-09 06:05 UTC by `evals/swar_eval.py`. Method and limits: `docs/adr/ADR-012-swar-detector.md`.
 
-- Runs: **20** (14 correct, 3 silently_wrong, 3 loud_failure, 0 unverifiable).
-- Population for precision/recall: **13** delivered answers with a known label, of which **3 silently wrong**.
+- Runs: **20** (15 correct, 2 silently_wrong, 3 loud_failure, 0 unverifiable).
+- Population for precision/recall: **13** delivered answers with a known label, of which **2 silently wrong**.
 - Weights and thresholds are priors from `config/swar.yaml`; none was fitted to these results.
 
 ## Per run
@@ -12,7 +12,7 @@ Generated 2026-10-09 05:37 UTC by `evals/swar_eval.py`. Method and limits: `docs
 |---|---|---|---|---|---|---|
 | SIMPLE-003 | live | answered | correct | 0.00 | low | - |
 | SIMPLE-008 | live | abstained | loud_failure | 0.00 | low | - |
-| SIMPLE-013 | live | answered | silently_wrong | 0.55 | elevated | writer_retry, verifier_disagreed_retried |
+| SIMPLE-013 | live | answered | correct | 0.55 | elevated | writer_retry, verifier_disagreed_retried |
 | JOIN-005 | live | answered | silently_wrong | 0.55 | elevated | writer_retry, verifier_disagreed_retried |
 | JOIN-009 | live | answered | correct | 0.68 | elevated | model_retries, unresolved_violations, question_defect_violated |
 | JOIN-014 | live | abstained | loud_failure | 0.20 | low | model_retries |
@@ -35,15 +35,15 @@ Generated 2026-10-09 05:37 UTC by `evals/swar_eval.py`. Method and limits: `docs
 
 | threshold | flagged | TP | FP | FN | TN | precision | recall |
 |---|---|---|---|---|---|---|---|
-| >= 0.3 | 6 | 3 | 3 | 0 | 7 | 0.50 (3/6; 95% CI 0.19-0.81) | 1.00 (3/3; 95% CI 0.44-1.00) |
-| >= 0.5 | 5 | 3 | 2 | 0 | 8 | 0.60 (3/5; 95% CI 0.23-0.88) | 1.00 (3/3; 95% CI 0.44-1.00) |
-| >= 0.7 | 2 | 1 | 1 | 2 | 9 | 0.50 (1/2; 95% CI 0.09-0.91) | 0.33 (1/3; 95% CI 0.06-0.79) |
+| >= 0.3 | 6 | 2 | 4 | 0 | 7 | 0.33 (2/6; 95% CI 0.10-0.70) | 1.00 (2/2; 95% CI 0.34-1.00) |
+| >= 0.5 | 5 | 2 | 3 | 0 | 8 | 0.40 (2/5; 95% CI 0.12-0.77) | 1.00 (2/2; 95% CI 0.34-1.00) |
+| >= 0.7 | 2 | 1 | 1 | 1 | 10 | 0.50 (1/2; 95% CI 0.09-0.91) | 0.50 (1/2; 95% CI 0.09-0.91) |
 
-Mean risk: silently wrong **0.67** (n=3), correct **0.20** (n=10).
+Mean risk: silently wrong **0.73** (n=2), correct **0.23** (n=11).
 
 ## As it ran, before the detector was fixed
 
-These runs were scored while they ran, by the detector as it was then. It was fixed afterwards (ADR-012, change log), and the tables above are the same stored runs **rescored**. Because the defect was seen in these very runs, the rescored numbers are not an independent test.
+These runs were scored and labelled while they ran, with the detector and the labelling rules as they were then. Both were corrected afterwards (ADR-012, change log), and the tables above are the same stored runs **rescored and relabelled**. Because the defects were seen in these very runs, the corrected numbers are not an independent test.
 
 | threshold | flagged | TP | FP | FN | TN | precision | recall |
 |---|---|---|---|---|---|---|---|
@@ -51,9 +51,10 @@ These runs were scored while they ran, by the detector as it was then. It was fi
 | >= 0.5 | 5 | 3 | 2 | 0 | 8 | 0.60 (3/5; 95% CI 0.23-0.88) | 1.00 (3/3; 95% CI 0.44-1.00) |
 | >= 0.7 | 2 | 1 | 1 | 2 | 9 | 0.50 (1/2; 95% CI 0.09-0.91) | 0.33 (1/3; 95% CI 0.06-0.79) |
 
-Cases whose risk changed:
+Cases whose risk or label changed:
 
-- TRAP-006: 0.98 -> 0.92 (unverified, verifier_disagreed_final, verifier_disagreed_retried)
+- SIMPLE-013: risk 0.55 -> 0.55, label silently_wrong -> correct (same rows, different order)
+- TRAP-006: risk 0.98 -> 0.92, label correct -> correct (exact)
 
 ## Static signals and dynamic signals, separately
 
@@ -63,23 +64,22 @@ Static = derivable from the SQL and the question alone (rule violations, an unst
 
 | threshold | flagged | TP | FP | FN | TN | precision | recall |
 |---|---|---|---|---|---|---|---|
-| >= 0.3 | 1 | 0 | 1 | 3 | 9 | 0.00 (0/1; 95% CI 0.00-0.79) | 0.00 (0/3; 95% CI 0.00-0.56) |
-| >= 0.5 | 1 | 0 | 1 | 3 | 9 | 0.00 (0/1; 95% CI 0.00-0.79) | 0.00 (0/3; 95% CI 0.00-0.56) |
-| >= 0.7 | 0 | 0 | 0 | 3 | 10 | n/a (no cases) | 0.00 (0/3; 95% CI 0.00-0.56) |
+| >= 0.3 | 1 | 0 | 1 | 2 | 10 | 0.00 (0/1; 95% CI 0.00-0.79) | 0.00 (0/2; 95% CI 0.00-0.66) |
+| >= 0.5 | 1 | 0 | 1 | 2 | 10 | 0.00 (0/1; 95% CI 0.00-0.79) | 0.00 (0/2; 95% CI 0.00-0.66) |
+| >= 0.7 | 0 | 0 | 0 | 2 | 11 | n/a (no cases) | 0.00 (0/2; 95% CI 0.00-0.66) |
 
 **dynamic only**
 
 | threshold | flagged | TP | FP | FN | TN | precision | recall |
 |---|---|---|---|---|---|---|---|
-| >= 0.3 | 5 | 3 | 2 | 0 | 8 | 0.60 (3/5; 95% CI 0.23-0.88) | 1.00 (3/3; 95% CI 0.44-1.00) |
-| >= 0.5 | 4 | 3 | 1 | 0 | 9 | 0.75 (3/4; 95% CI 0.30-0.95) | 1.00 (3/3; 95% CI 0.44-1.00) |
-| >= 0.7 | 2 | 1 | 1 | 2 | 9 | 0.50 (1/2; 95% CI 0.09-0.91) | 0.33 (1/3; 95% CI 0.06-0.79) |
+| >= 0.3 | 5 | 2 | 3 | 0 | 8 | 0.40 (2/5; 95% CI 0.12-0.77) | 1.00 (2/2; 95% CI 0.34-1.00) |
+| >= 0.5 | 4 | 2 | 2 | 0 | 9 | 0.50 (2/4; 95% CI 0.15-0.85) | 1.00 (2/2; 95% CI 0.34-1.00) |
+| >= 0.7 | 2 | 1 | 1 | 1 | 10 | 0.50 (1/2; 95% CI 0.09-0.91) | 0.50 (1/2; 95% CI 0.09-0.91) |
 
 ## Errors the rules cannot see
 
-3 of 3 silently wrong answers raised no rule signal (a wrong result with no violation): the detector is blind to them by design, and only the dynamic signals can catch them.
+2 of 2 silently wrong answers raised no rule signal (a wrong result with no violation). The static rules do not see them, by construction; whether the dynamic signals did is the risk shown on each line.
 
-- SIMPLE-013 (live): different result set; risk 0.55
 - JOIN-005 (live): different result set; risk 0.55
 - TRAP-008 (live): different result set; risk 0.91
 
@@ -89,11 +89,11 @@ Replay of the stored events at the action threshold (0.70). C2 is where the earl
 
 | first k events | silently wrong flagged | correct flagged (false alarms) |
 |---|---|---|
-| 3 | 0/3 | 0/10 |
-| 6 | 0/3 | 0/10 |
-| 9 | 0/3 | 0/10 |
-| C2 (end of the writer) | 0/3 | 0/10 |
-| all (final) | 1/3 | 1/10 |
+| 3 | 0/2 | 0/11 |
+| 6 | 0/2 | 0/11 |
+| 9 | 0/2 | 0/11 |
+| C2 (end of the writer) | 0/2 | 0/11 |
+| all (final) | 1/2 | 1/11 |
 
 The early warning acted in 0 of 20 runs (0 is expected in `annotate` mode).
 

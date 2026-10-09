@@ -270,17 +270,26 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 ### Fase 5 — Trazas + detector SWAR (núcleo AgentTrace) (Semana 4)
 **Objetivo:** ver y **predecir** cuándo el agente está por equivocarse.
 
-- [ ] `observability/tracing.py`: spans OpenTelemetry con las convenciones GenAI (`gen_ai.*`) para cada llamada al LLM, cada tool call MCP y cada paso del agente; atributos propios `lb.defects_touched`, `lb.verifier_agreement`, `lb.confidence`
-- [ ] `docker-compose`: OTel Collector + Arize Phoenix (o Jaeger) local
-- [ ] `swar_detector.py`, con 3 familias de señales:
+- [x] `observability/tracing.py`: spans OpenTelemetry con las convenciones GenAI (`gen_ai.*`) para cada llamada al LLM, cada tool call MCP y cada paso del agente; atributos propios `lb.defects_touched`, `lb.verifier_agreement`, `lb.confidence`
+- [x] `docker-compose`: OTel Collector + Arize Phoenix (o Jaeger) local
+- [x] `swar_detector.py`, con 3 familias de señales:
   1. **Resultado:** el verifier no coincide; `violations` no vacías; respuesta confiada sobre 0 filas; truncamiento ignorado
   2. **Trayectoria:** bucles de tools (>N llamadas iguales), cascadas de errores, reintentos de SQL
   3. **Semántica:** la pregunta toca entidades con defectos conocidos y el SQL no aplica la regla
-- [ ] **Early warning:** puntaje de riesgo calculado con los primeros *k* spans; si supera un umbral, el agente escala (otro modelo, pregunta aclaratoria o abstención)
-- [ ] 👤 Write‑up corto `docs/swar-method.md` que conecte con tu tesis (*Software Behavior Prediction Using Ontologies*, 2015): misma idea, de trazas de software a trazas de agentes
+- [x] **Early warning:** puntaje de riesgo calculado con los primeros *k* spans; si supera un umbral, el agente escala (otro modelo, pregunta aclaratoria o abstención)
+- [~] 👤 Write‑up corto `docs/swar-method.md` que conecte con tu tesis (*Software Behavior Prediction Using Ontologies*, 2015): misma idea, de trazas de software a trazas de agentes
 
 **Verificación:** correr 20 casos del golden set y ver las trazas en Phoenix (`http://localhost:6006`); `uv run pytest tests/test_swar.py`.
 **DoD:** cada respuesta incluye `swar_risk`; el detector tiene precision/recall medidos contra las etiquetas del golden set.
+
+**Estado (2026-10-09): cumplida, con salvedades que importan.** 636 tests en verde, lint limpio.
+- **Trazas:** spans `invoke_agent` → rol → `chat <modelo>` / `execute_tool` con atributos `gen_ai.*`, OpenInference y `lb.*`; los spans del servidor MCP (proceso aparte) se anidan por el contexto W3C. Verificado de punta a punta: una pregunta real llegó a Phoenix como 29 spans en una sola traza, con tokens, SQL y `lb.swar_risk`. Apagadas por defecto (`LB_TRACING`); el contenido solo con `LB_TRACE_CONTENT=1`; un colector caído no frena al agente (probado). `make obs-up` levanta Phoenix y el Collector (imágenes fijadas y verificadas). *Ver la interfaz en `http://localhost:6006` queda de tu lado: no puedo juzgar el render.*
+- **Detector SWAR y early warning:** `swar_risk`, `swar_level`, `swar_signals` y `defects_touched` en cada respuesta; pesos a priori en `config/swar.yaml` (ADR-012). El tope del grupo de reglas evita que una heurística sola haga actuar al agente.
+- **Medición** (`python -m evals.swar_eval`, 20 casos fijos commiteados antes de medir, `evals/reports/`): 27 respuestas entregadas, 5 erróneas en silencio. A 0.5 el detector marcó 3 de 5 (precision 3/6); al umbral de acción, 2 de 5. **Las reglas estáticas no vieron ninguna; quien las detectó fue el verifier.** Dos respuestas erróneas no las detectó nada: escritor y verifier compartieron la misma lectura equivocada.
+- **El early warning no actuó en ninguna de las 40 corridas reales** (C1 alcanzado en 5, ninguna sobre el umbral; C2 marcó 0 de 5). Con estos pesos `gate` y `annotate` se habrían comportado igual. El mecanismo está verificado con pruebas guionizadas, no con un caso real, y esta muestra **no respalda** que los primeros spans ya anticipen el error.
+- **Corregido después de ver resultados:** cinco errores de definición (cuatro del detector, uno de las etiquetas) hallados por la línea base y las corridas; ninguno cambió un peso ni un umbral. Los tres casos reetiquetados pasaron todos de «errónea» a «correcta»; los informes conservan las cifras *como corrieron*.
+- **Muestras diminutas** (2, 3 y 5 positivos): los intervalos abarcan casi todo el rango. El golden set sigue en `review: draft`. Los dos perfiles usan modelos distintos y `omniroute-free` se validó con un modelo individual porque el combo da HTTP 500.
+- **Pendiente tuyo 👤:** el apartado de tu tesis en `docs/swar-method.md` (el resto del documento está redactado). Y revisar el golden set.
 
 ---
 

@@ -1,6 +1,6 @@
 # SWAR detector measurement: baseline
 
-Generated 2026-10-09 05:17 UTC by `evals/swar_eval.py`. Method and limits: `docs/adr/ADR-012-swar-detector.md`.
+Generated 2026-10-09 06:05 UTC by `evals/swar_eval.py`. Method and limits: `docs/adr/ADR-012-swar-detector.md`.
 
 - Runs: **70** (55 correct, 13 silently_wrong, 0 loud_failure, 2 unverifiable).
 - Population for precision/recall: **68** delivered answers with a known label, of which **13 silently wrong**.
@@ -115,20 +115,21 @@ Static = derivable from the SQL and the question alone (rule violations, an unst
 
 ## Errors the rules cannot see
 
-1 of 13 silently wrong answers raised no rule signal (a wrong result with no violation): the detector is blind to them by design, and only the dynamic signals can catch them.
+1 of 13 silently wrong answers raised no rule signal (a wrong result with no violation). The static rules do not see them, by construction; whether the dynamic signals did is the risk shown on each line.
 
 - TRAP-009 (oracle-naive): different result set; risk 0.00
 
 ## Early warning: risk from the first k events
 
-Replay of the stored events at the action threshold (0.70). k = 'all' is the final assessment.
+Replay of the stored events at the action threshold (0.70). C2 is where the early warning acts before the verifier is spent; the final row adds the verifier.
 
-| k | silently wrong flagged | correct flagged (false alarms) |
+| first k events | silently wrong flagged | correct flagged (false alarms) |
 |---|---|---|
 | 3 | 0/13 | 0/55 |
 | 6 | 0/13 | 0/55 |
 | 9 | 0/13 | 0/55 |
-| all | 0/13 | 0/55 |
+| C2 (end of the writer) | 0/13 | 0/55 |
+| all (final) | 0/13 | 0/55 |
 
 The early warning acted in 0 of 70 runs (0 is expected in `annotate` mode).
 

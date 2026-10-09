@@ -228,6 +228,24 @@ async def run_oracle(
     return records
 
 
+def relabel(records: list[Record]) -> list[Record]:
+    """Label stored runs again with the current rules (see evals/labels.py).
+
+    Write cases keep their stored label: it was computed from the queued request, which is deleted
+    after each run so that the queue stays clean, so it cannot be read back."""
+    golden = {c.id: c for c in load_golden()}
+    out = []
+    with connect("reader", autocommit=True) as reader:
+        for r in records:
+            case = golden[r.case_id]
+            if case.expected_behavior == Behavior.PROPOSE_WRITE:
+                out.append(r)
+                continue
+            label = label_run(case, r.result, reader)
+            out.append(r.model_copy(update={"kind": label.kind, "reason": label.reason}))
+    return out
+
+
 def rescore(
     records: list[Record], ontology: Ontology | None = None, cfg: SwarConfig | None = None
 ) -> list[Record]:
@@ -401,19 +419,20 @@ def build_report(
         before = [(r.result.swar_risk, r.kind == "silently_wrong") for r in population(as_run)]
         lines += [
             "", "## As it ran, before the detector was fixed", "",
-            "These runs were scored while they ran, by the detector as it was then. It was fixed afterwards "
-            "(ADR-012, change log), and the tables above are the same stored runs **rescored**. "
-            "Because the defect was seen in these very runs, the rescored numbers are not an independent test.",
+            "These runs were scored and labelled while they ran, with the detector and the labelling rules as "
+            "they were then. Both were corrected afterwards (ADR-012, change log), and the tables above are "
+            "the same stored runs **rescored and relabelled**. Because the defects were seen in these very "
+            "runs, the corrected numbers are not an independent test.",
             "",
-        ] + confusion_table(before) + ["", "Cases whose risk changed:", ""]  # fmt: skip
+        ] + confusion_table(before) + ["", "Cases whose risk or label changed:", ""]  # fmt: skip
         changed = [
             (a, b)
             for a, b in zip(as_run, records, strict=True)
-            if abs(a.result.swar_risk - b.result.swar_risk) > 1e-9
+            if abs(a.result.swar_risk - b.result.swar_risk) > 1e-9 or a.kind != b.kind
         ]
         lines += [
-            f"- {a.case_id}: {a.result.swar_risk:.2f} -> {b.result.swar_risk:.2f} "
-            f"({', '.join(sorted({s.name for s in a.result.swar_signals} ^ {s.name for s in b.result.swar_signals}))})"
+            f"- {a.case_id}: risk {a.result.swar_risk:.2f} -> {b.result.swar_risk:.2f}, "
+            f"label {a.kind} -> {b.kind} ({b.reason[:60]})"
             for a, b in changed
         ] or ["- none"]
 
@@ -431,8 +450,8 @@ def build_report(
     blind = [r for r in wrong if not (RULE_SIGNALS & {s.name for s in r.result.swar_signals})]
     lines += ["## Errors the rules cannot see", "",
               f"{len(blind)} of {len(wrong)} silently wrong answers raised no rule signal "
-              "(a wrong result with no violation): the detector is blind to them by design, and only "
-              "the dynamic signals can catch them.", ""]  # fmt: skip
+              "(a wrong result with no violation). The static rules do not see them, by construction; "
+              "whether the dynamic signals did is the risk shown on each line.", ""]  # fmt: skip
     lines += [
         f"- {r.case_id} ({r.variant}): {r.reason}; risk {r.result.swar_risk:.2f}" for r in blind
     ] or ["- none"]
@@ -524,6 +543,8 @@ def main(argv: list[str] | None = None) -> int:
     rep = sub.add_parser("report", help="build a report from stored results")
     rep.add_argument("files", nargs="+", type=Path)
     rep.add_argument("--name", required=True)
+    rep.add_argument("--relabel", action="store_true",
+                     help="label the stored runs again with the current rules (needs the database)")  # fmt: skip
     rep.add_argument("--rescore", action="store_true",
                      help="score the stored runs again with the current detector and show both")  # fmt: skip
     args = parser.parse_args(argv)
@@ -542,7 +563,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "report":
         records = [r for f in args.files for r in load_records(f)]
-        as_run = records if args.rescore else None
+        as_run = records if (args.rescore or args.relabel) else None
+        if args.relabel:
+            records = relabel(records)
         if args.rescore:
             records = rescore(records)
         print(f"wrote {write_report(build_report(records, args.name, as_run=as_run), args.name)}")

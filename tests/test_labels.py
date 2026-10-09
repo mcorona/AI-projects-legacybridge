@@ -168,3 +168,58 @@ def test_a_write_is_right_when_the_queued_request_changes_the_expected_rows(
         label_run(case, result("pending_approval", request_id=999_999_999), reader).kind
         == "silently_wrong"
     )
+
+
+# --------------------------------------------------------------------------- presentation leniency
+@pytest.mark.integration
+def test_the_same_rows_in_another_order_are_right_unless_a_limit_makes_order_matter(reader):
+    unlimited = GOLDEN["JOIN-014"]  # ... GROUP BY estado HAVING ... ORDER BY estado: no LIMIT
+    rows = reader.execute(unlimited.expected_sql).fetchall()
+    assert matches_expected(rows[::-1], unlimited.expected_sql, unlimited.expected_result_hash) == (
+        True,
+        "same rows, different order",
+    )
+    limited = GOLDEN["SIMPLE-012"]  # the five most expensive products: ORDER BY ... LIMIT 5
+    top = reader.execute(limited.expected_sql).fetchall()
+    assert matches_expected(top, limited.expected_sql, limited.expected_result_hash)[0] is True
+    assert (
+        matches_expected(top[::-1], limited.expected_sql, limited.expected_result_hash)[0] is False
+    )
+
+
+@pytest.mark.integration
+def test_a_single_expected_figure_inside_a_wider_result_counts_only_if_the_answer_states_it(reader):
+    case = GOLDEN["TRAP-013"]  # dollars billed in 2002: one figure
+    wide_sql = (
+        "WITH f AS (SELECT DISTINCT ON (serie, numfac) serie, numfac, status, fecha, ref1, "
+        "REPLACE(REPLACE(TRIM(total), '$', ''), ',', '')::numeric AS total FROM faccab "
+        "ORDER BY serie, numfac, fcaptura DESC) "
+        "SELECT ref1 AS moneda, SUM(total) AS total FROM f "
+        "WHERE status = 'V' AND fecha BETWEEN '20020101' AND '20021231' GROUP BY ref1"
+    )
+    figure = reader.execute(case.expected_sql).fetchone()[0]
+    states = result(
+        sql=wide_sql, rows=[["MXN", 1], ["USD", 2]], answer=f"Se facturaron {figure} USD."
+    )
+    lab = label_run(case, states, reader)
+    assert lab.kind == "correct" and "labelled row of 2" in lab.reason
+    omits = result(
+        sql=wide_sql, rows=[["MXN", 1], ["USD", 2]], answer="Se facturó mucho en dólares."
+    )
+    assert label_run(case, omits, reader).kind == "silently_wrong"
+    other = result(sql="SELECT 1 AS a UNION ALL SELECT 2", rows=[[1], [2]], answer="Son 244677.27")
+    assert label_run(case, other, reader).kind == "silently_wrong", (
+        "the figure must be in the evidence"
+    )
+
+
+@pytest.mark.integration
+def test_two_unlabelled_totals_of_one_invoice_are_not_an_answer(reader):
+    """Found while widening the labels: TRAP-015's naive query returns both captures of an invoice
+    in one unlabelled column. The right figure is among them, but nothing says which one it is."""
+    case = GOLDEN["TRAP-015"]
+    naive = result(
+        sql=case.naive_sql, rows=[["67901.06"], ["50297.08"]], answer="67901.06; 50297.08"
+    )
+    lab = label_run(case, naive, reader)
+    assert lab.kind == "silently_wrong" and lab.reason == "different result set"

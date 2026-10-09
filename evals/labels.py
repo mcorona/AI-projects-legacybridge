@@ -17,8 +17,9 @@ abstain            it answered or queued a change instead of abstaining
 propose_write      it did not queue a request, or queued a different change
 =================  =========================================================================
 
-Comparison is strict on purpose (columns by position, ADR-011) with one leniency: extra columns
-are accepted when some subset of the agent's columns, in order, reproduces the expected hash.
+Comparison is strict on purpose (columns by position, ADR-011). Three presentation differences are
+tolerated, see ``matches_expected``: extra columns, another row order when the expected query does
+not LIMIT, and a single expected figure inside a wider result that the answer states.
 """
 
 from __future__ import annotations
@@ -58,11 +59,52 @@ def _run(conn, sql: str) -> list[tuple]:
         return cur.fetchall()
 
 
+def _has_limit(sql: str) -> bool:
+    return sqlglot.parse_one(sql, read="postgres").args.get("limit") is not None
+
+
+def _is_figure(cell: Any, wanted: float) -> bool:
+    if isinstance(cell, bool):
+        return False
+    try:
+        return round(float(cell), 2) == wanted
+    except (TypeError, ValueError):
+        return False
+
+
+def identified_figure(rows: list[tuple], figure: Any) -> bool:
+    """True when ``figure`` sits in exactly one row and that row carries a label to read it by.
+
+    "How much did we bill in dollars?" answered with one row per currency is right: the USD row
+    says which figure is the answer. The same figure among other values of an unlabelled single
+    column (two captures of one invoice with different totals) is not: nothing says which one
+    answers the question, so the reader cannot tell.
+    """
+    try:
+        wanted = round(float(figure), 2)
+    except (TypeError, ValueError):
+        return False
+    holding = [row for row in rows if any(_is_figure(cell, wanted) for cell in row)]
+    return len(holding) == 1 and len(holding[0]) >= 2
+
+
 def matches_expected(rows: list[tuple], expected_sql: str, expected_hash: str) -> tuple[bool, str]:
-    """True when ``rows`` is the expected result, exactly or on a subset of its columns."""
+    """True when ``rows`` is the expected result, exactly or in one of three tolerated ways.
+
+    Tolerated, because each is a different presentation of the same answer: extra columns (some
+    subset of the agent's columns reproduces the expected hash); the same rows in another order when
+    the expected query sorts but does not LIMIT (the order is only presentation, whereas with a
+    LIMIT it decides which rows are in the result). Anything else is a different result set.
+    """
     ordered = has_top_level_order(expected_sql)
     if result_hash(rows, ordered=ordered) == expected_hash:
         return True, "exact"
+    if (
+        ordered
+        and not _has_limit(expected_sql)
+        and result_hash(rows, ordered=False) == expected_hash
+    ):
+        return True, "same rows, different order"
     width = len(rows[0]) if rows else 0
     for n in range(1, width):
         for picked in combinations(range(width), n):
@@ -91,9 +133,14 @@ def _label_answer_case(case: GoldenCase, result: AgentResult, conn) -> Label:
     except Exception as error:  # noqa: BLE001 - the evidence SQL ran once; a failure now is odd
         return Label("unverifiable", f"could not re-run the evidence SQL: {str(error)[:80]}")
     ok, how = matches_expected(rows, case.expected_sql, case.expected_result_hash)
+    expected_rows = _run(conn, case.expected_sql)
+    single = len(expected_rows) == 1 and len(expected_rows[0]) == 1
+    if not ok and single and len(rows) > 1 and identified_figure(rows, expected_rows[0][0]):
+        # e.g. grouped by currency when asked for dollars: a wider result in which a labelled row
+        # holds the figure. It only counts as right if the answer states that figure (below).
+        ok, how = True, f"the figure is one labelled row of {len(rows)}"
     if not ok:
         return Label("silently_wrong", how)
-    expected_rows = _run(conn, case.expected_sql)
     if len(expected_rows) == 1 and len(expected_rows[0]) == 1:
         figure = expected_rows[0][0]
         if isinstance(figure, int | float) or hasattr(figure, "quantize"):

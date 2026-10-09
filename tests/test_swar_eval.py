@@ -160,3 +160,16 @@ def test_a_rescored_report_shows_what_it_looked_like_as_it_ran():
     assert (
         "## As it ran, before the detector was fixed" in text and "not an independent test" in text
     )
+
+
+def test_the_as_run_section_lists_a_case_whose_label_alone_changed():
+    """A relabelled case must show up even when its risk did not move: that is how a reader sees
+    that the labelling rules, and not only the detector, were corrected after the run."""
+    ontology = __import__(
+        "legacybridge.semantic.loader", fromlist=["load_ontology"]
+    ).load_ontology()
+    as_run = [rec("a", "silently_wrong", 0.0), rec("b", "correct", 0.0)]
+    now = [rec("a", "correct", 0.0), rec("b", "correct", 0.0)]
+    text = build_report(now, "u", ontology, CFG, as_run=as_run)
+    assert "- a: risk 0.00 -> 0.00, label silently_wrong -> correct" in text
+    assert "- b:" not in text
