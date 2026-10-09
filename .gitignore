@@ -22,3 +22,6 @@ evals/results/
 
 # Local telemetry
 var/
+
+# macOS
+.DS_Store
