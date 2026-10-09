@@ -84,6 +84,13 @@ def setup_tracing(service_name: str = "legacybridge") -> TracerProvider | None:
         return _provider
 
 
+def flush_tracing(timeout_ms: int = 5000) -> None:
+    """Send what is queued but keep the provider (a warm Lambda environment answers again)."""
+    with _lock:
+        if _provider is not None:
+            _provider.force_flush(timeout_ms)
+
+
 def shutdown_tracing() -> None:
     """Flush what is queued (called when a short-lived process exits)."""
     global _provider

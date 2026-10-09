@@ -515,28 +515,43 @@ def _print_report(ds: Dataset) -> None:
         print(f"  {defect}: {counts}")
 
 
+def seed_database(seed: int, conn):
+    """Generate the invoicing and inventory data for ``seed`` and load it through ``conn``.
+
+    Shared by this script and by the database initializer of the AWS stack (ADR-014), so a deployed
+    database holds exactly what the golden set was hashed against.
+    """
+    # Imported here because scripts.seed_sicpt imports this module at top level.
+    from scripts.seed_sicpt import generate_sicpt, load_sicpt
+
+    ds = generate(seed)
+    inv = generate_sicpt(seed, ds.productos)
+    load(ds, conn)
+    load_sicpt(inv, conn)
+    # A freshly loaded database has no planner statistics until autovacuum gets to it, and without
+    # them some reference queries pick a plan that exceeds lb_reader's 5 s limit (found in CI,
+    # where nothing waits for autovacuum). Same data, same plans, every time.
+    conn.execute("ANALYZE")
+    conn.commit()
+    return ds, inv
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--dry-run", action="store_true", help="print counts, do not load")
     args = parser.parse_args()
 
-    # Imported here because scripts.seed_sicpt imports this module at top level.
     from legacybridge.db import connect
-    from scripts.seed_sicpt import SICPT_TABLES, generate_sicpt, load_sicpt
+    from scripts.seed_sicpt import SICPT_TABLES, generate_sicpt
     from scripts.seed_sicpt import defect_profile as sicpt_profile
 
-    ds = generate(args.seed)
-    inv = generate_sicpt(args.seed, ds.productos)
-    if not args.dry_run:
+    if args.dry_run:
+        ds = generate(args.seed)
+        inv = generate_sicpt(args.seed, ds.productos)
+    else:
         with connect("admin") as conn:
-            load(ds, conn)
-            load_sicpt(inv, conn)
-            # A freshly loaded database has no planner statistics until autovacuum gets to it, and
-            # without them some reference queries pick a plan that exceeds lb_reader's 5 s limit
-            # (found in CI, where nothing waits for autovacuum). Same data, same plans, every time.
-            conn.execute("ANALYZE")
-            conn.commit()
+            ds, inv = seed_database(args.seed, conn)
         print(f"seed={args.seed} loaded and analyzed")
     _print_report(ds)
     print("sicpt rows:", {t: len(getattr(inv, t)) for t in SICPT_TABLES})
