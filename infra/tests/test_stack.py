@@ -336,13 +336,15 @@ def test_turning_xray_on_adds_one_endpoint_the_two_write_actions_and_the_switche
     ]
 
 
-def test_applying_the_guardrail_is_allowed_on_the_guardrail_and_its_cross_region_profile_only(
+def test_applying_the_guardrail_is_allowed_on_it_and_on_its_profile_in_every_destination_region(
     resources,
 ):
-    """The first deploy was refused for lack of the profile: STANDARD routes through it."""
+    """The first deploy was refused: STANDARD routes through a profile, and AWS requires the action
+    on the profile in the caller's region and in each destination region."""
     apply = [s for s in statements(resources) if "bedrock:ApplyGuardrail" in as_list(s["Action"])]
     assert len(apply) == 1
     arns = [json.dumps(r) for r in as_list(apply[0]["Resource"])]
-    assert len(arns) == 2 and any("guardrail-profile/us.guardrail.v1:0" in a for a in arns)
+    profiles = sorted(a for a in arns if "guardrail-profile/us.guardrail.v1:0" in a)
+    assert [a.split(":")[3] for a in profiles] == ["us-east-1", "us-east-2", "us-west-2"]
+    assert len(arns) == 4 and not any("*" in a for a in arns)
     assert any("Guardrail" in a and "guardrail-profile" not in a for a in arns)
-    assert not any("*" in a for a in arns)
