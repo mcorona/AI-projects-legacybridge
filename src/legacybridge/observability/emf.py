@@ -14,7 +14,13 @@ from typing import Any
 from legacybridge.agent.schemas import AgentResult
 
 NAMESPACE = "LegacyBridge"
-DIMENSION_SETS = [["Profile"], ["Profile", "Status"]]
+# Every custom metric is billed as a series per combination of dimension values, so the dimensions
+# are kept to what the dashboard reads: each metric by profile, and only the question count by
+# status. (The first design repeated all 11 metrics for every status: 55 series a profile, four
+# times the cost for nothing the dashboard shows. The cost model, scripts/cost_model.py, found it.)
+DIMENSIONS = ["Profile"]
+STATUS_DIMENSIONS = ["Profile", "Status"]
+STATUS_METRICS = ("Questions",)
 UNITS = {
     "LatencyMs": "Milliseconds",
     "InputTokens": "Count",
@@ -28,6 +34,11 @@ UNITS = {
     "GuardrailBlocked": "Count",
     "GuardrailErrors": "Count",
 }
+
+
+def series_per_profile(statuses: int) -> int:
+    """Custom metrics one profile creates in CloudWatch, which bills each one by the month."""
+    return len(UNITS) + len(STATUS_METRICS) * statuses
 
 
 def cost_usd(result: AgentResult, price_in: float, price_out: float) -> float:
@@ -71,9 +82,14 @@ def emf_record(
             "CloudWatchMetrics": [
                 {
                     "Namespace": NAMESPACE,
-                    "Dimensions": DIMENSION_SETS,
+                    "Dimensions": [DIMENSIONS],
                     "Metrics": [{"Name": k, "Unit": UNITS[k]} for k in values],
-                }
+                },
+                {
+                    "Namespace": NAMESPACE,
+                    "Dimensions": [STATUS_DIMENSIONS],
+                    "Metrics": [{"Name": k, "Unit": UNITS[k]} for k in STATUS_METRICS],
+                },
             ],
         },
         "Profile": result.profile or "unknown",

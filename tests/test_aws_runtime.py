@@ -268,17 +268,22 @@ def test_the_token_comes_from_the_environment_or_from_its_secret():
 
 
 # --------------------------------------------------------------------------- metrics (EMF)
-def test_the_record_declares_every_metric_with_a_unit_and_two_dimension_sets():
+def test_the_record_declares_every_metric_by_profile_and_only_the_question_count_by_status():
     record = emf.emf_record(result(), price_in=1.10, price_out=5.50, now_ms=123)
-    declared = record["_aws"]["CloudWatchMetrics"][0]
-    assert declared["Namespace"] == "LegacyBridge" and declared["Dimensions"] == [
-        ["Profile"],
-        ["Profile", "Status"],
-    ]
-    names = [m["Name"] for m in declared["Metrics"]]
+    everything, by_status = record["_aws"]["CloudWatchMetrics"]
+    assert everything["Namespace"] == by_status["Namespace"] == "LegacyBridge"
+    assert everything["Dimensions"] == [["Profile"]]
+    assert by_status["Dimensions"] == [["Profile", "Status"]]
+    names = [m["Name"] for m in everything["Metrics"]]
     assert record["_aws"]["Timestamp"] == 123 and all(n in record for n in names)
-    assert {m["Name"]: m["Unit"] for m in declared["Metrics"]}["LatencyMs"] == "Milliseconds"
+    assert {m["Name"]: m["Unit"] for m in everything["Metrics"]}["LatencyMs"] == "Milliseconds"
+    assert [m["Name"] for m in by_status["Metrics"]] == ["Questions"]
     assert (record["Profile"], record["Status"]) == ("bedrock-claude", "answered")
+
+
+def test_the_number_of_series_a_profile_creates_is_what_the_dashboard_needs_and_no_more():
+    """Each series is billed by the month; repeating every metric per status was 55 and not 15."""
+    assert emf.series_per_profile(statuses=4) == len(emf.UNITS) + 4 == 15
 
 
 def test_the_cost_is_tokens_times_the_price_per_million_and_zero_when_unpriced():

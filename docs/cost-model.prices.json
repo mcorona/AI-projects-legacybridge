@@ -1,0 +1,33 @@
+{
+  "note": "Snapshot of the AWS prices that docs/cost-model.md uses, read from the AWS Price List API (GetProducts, us-east-1, on-demand) on 2026-10-09. Model token prices are not here: they live in config/models.yaml, from the same source. Prices change; regenerate before relying on them.",
+  "retrieved": "2026-10-09",
+  "region": "us-east-1",
+  "items": {
+    "lambda_gb_second_arm": {
+      "tiers": [[0, 7500000000, 0.0000133334], [7500000000, 18750000000, 0.0000120001], [18750000000, null, 0.0000106667]],
+      "unit": "USD per GB-second, by monthly GB-seconds",
+      "published": "2026-10-01T18:47:46Z"
+    },
+    "lambda_request": {"usd": 2e-7, "unit": "USD per request", "published": "2026-10-01T18:47:46Z"},
+    "apigw_http_request": {
+      "tiers": [[0, 300000000, 0.000001], [300000000, null, 0.0000009]],
+      "unit": "USD per request, by monthly requests"
+    },
+    "dynamodb_write_request_unit": {"usd": 6.25e-7, "unit": "USD per write request unit, on demand"},
+    "dynamodb_read_request_unit": {"usd": 1.25e-7, "unit": "USD per read request unit, on demand"},
+    "secret_month": {"usd": 0.4, "unit": "USD per secret per month"},
+    "cloudwatch_metric_month": {
+      "tiers": [[0, 10000, 0.3], [10000, 250000, 0.1]],
+      "unit": "USD per custom metric per month",
+      "published": "2026-10-07T11:55:40Z"
+    },
+    "cloudwatch_logs_ingest_gb": {"usd": 0.5, "unit": "USD per GB ingested, standard class", "published": "2026-10-07T11:55:40Z"},
+    "rds_t4g_micro_postgres_single_az_hour": {"usd": 0.016, "unit": "USD per instance hour", "published": "2026-10-06T22:40:50Z"},
+    "rds_gp3_gb_month": {"usd": 0.115, "unit": "USD per GB-month"},
+    "vpc_interface_endpoint_hour": {"usd": 0.01, "unit": "USD per endpoint per hour (one subnet)"},
+    "vpc_interface_endpoint_gb": {"usd": 0.01, "unit": "USD per GB processed, first petabyte"},
+    "guardrail_content_policy_1k_text_units": {"usd": 0.15, "unit": "USD per 1,000 text units", "published": "2026-10-06T14:47:26Z"},
+    "guardrail_topic_policy_1k_text_units": {"usd": 0.15, "unit": "USD per 1,000 text units", "published": "2026-10-06T14:47:26Z"},
+    "guardrail_sensitive_information_1k_text_units": {"usd": 0.1, "unit": "USD per 1,000 text units (paid tier)", "published": "2026-10-06T14:47:26Z"}
+  }
+}
