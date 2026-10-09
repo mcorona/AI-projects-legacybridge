@@ -25,3 +25,10 @@ var/
 
 # macOS
 .DS_Store
+
+# CDK (infra/) working files
+infra/cdk.out/
+infra/cdk-outputs.json
+infra/cdk.context.json
+infra/.venv/
+infra/node_modules/

@@ -311,3 +311,47 @@ def test_emit_prints_one_json_line(capsys):
     emf.emit(result())
     line = capsys.readouterr().out.strip()
     assert "\n" not in line and json.loads(line)["Questions"] == 1
+
+
+# --------------------------------------------------------------------------- the Lambda wrapper
+def http_event(method, path, body=None, token=TOKEN):
+    """What API Gateway (HTTP API, payload 2.0) sends to the function."""
+    headers = {"content-type": "application/json"}
+    if token:
+        headers["authorization"] = f"Bearer {token}"
+    return {
+        "version": "2.0", "routeKey": f"{method} {path}", "rawPath": path, "rawQueryString": "",
+        "headers": headers, "isBase64Encoded": False,
+        "body": json.dumps(body) if body is not None else None,
+        "requestContext": {
+            "http": {"method": method, "path": path, "protocol": "HTTP/1.1", "sourceIp": "203.0.113.9", "userAgent": "curl"},
+            "stage": "$default", "requestId": "r1", "domainName": "x.execute-api.us-east-1.amazonaws.com",
+        },
+    }  # fmt: skip
+
+
+def test_an_api_gateway_event_reaches_the_app_and_the_response_has_the_shape_it_expects():
+    from legacybridge.aws.front import make_handler
+
+    store, dispatch = MemoryJobStore(), Recorder()
+    call = make_handler(create_front_app(store, dispatch, TOKEN, now=lambda: 1000.0))
+    out = call(http_event("POST", "/ask", {"question": "¿Cuántas facturas?"}), None)
+    assert out["statusCode"] == 202 and out["headers"]["content-type"] == "application/json"
+    body = json.loads(out["body"])
+    assert body["status"] == "pending" and len(dispatch.jobs) == 1
+    polled = call(http_event("GET", f"/ask/{body['id']}"), None)
+    assert polled["statusCode"] == 200 and json.loads(polled["body"])["status"] == "pending"
+    assert call(http_event("GET", "/ask/" + body["id"], token=None), None)["statusCode"] == 401
+    assert call(http_event("GET", "/health", token=None), None)["statusCode"] == 200
+
+
+def test_the_lambda_entry_point_builds_the_app_from_the_environment_once(monkeypatch):
+    from legacybridge.aws import front
+
+    built = []
+    monkeypatch.setattr(front, "_handler", None)
+    monkeypatch.setattr(front, "app_from_env", lambda: built.append(1) or create_front_app(
+        MemoryJobStore(), Recorder(), TOKEN))  # fmt: skip
+    assert front.handler(http_event("GET", "/health", token=None))["statusCode"] == 200
+    assert front.handler(http_event("GET", "/health", token=None))["statusCode"] == 200
+    assert built == [1]

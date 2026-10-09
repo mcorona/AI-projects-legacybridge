@@ -1,0 +1,10 @@
+# Only what the image needs goes into the build context (and into the CDK asset hash).
+*
+!pyproject.toml
+!uv.lock
+!src
+!config
+!db
+!scripts
+**/__pycache__
+**/*.pyc

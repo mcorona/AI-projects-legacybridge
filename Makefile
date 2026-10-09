@@ -1,4 +1,4 @@
-.PHONY: db-up db-reset seed test lint obs-up obs-down eval eval-gate eval-report
+.PHONY: db-up db-reset seed test lint obs-up obs-down eval eval-gate eval-report infra-test synth bootstrap deploy destroy aws-leftovers
 
 # Starts Postgres (creates .env from .env.example on first run) and waits until it is healthy.
 db-up:
@@ -46,3 +46,29 @@ eval: db-up
 
 eval-report:
 	uv run --group eval python -m evals.report --run-id $(RUN_ID) --docs
+
+# ---- AWS (Phase 7, ADR-014). `aws login --profile $(AWS_PROFILE)` first. Deploying costs money for
+# as long as the stack exists (about 0.07 USD an hour: RDS plus interface endpoints); destroy removes it.
+AWS_PROFILE ?= aif
+CDK = cd infra && AWS_PROFILE=$(AWS_PROFILE) npx --yes aws-cdk@2.1145.0
+
+infra-test:
+	cd infra && uv run pytest -q
+
+synth:
+	$(CDK) synth --quiet
+
+# Once per account and region: creates the CDKToolkit stack (an S3 bucket, an ECR repository, roles).
+bootstrap:
+	$(CDK) bootstrap
+
+deploy:
+	$(CDK) deploy --require-approval broadening --outputs-file cdk-outputs.json
+	AWS_PROFILE=$(AWS_PROFILE) uv run python -m scripts.aws_post_deploy
+
+destroy:
+	$(CDK) destroy --force
+	AWS_PROFILE=$(AWS_PROFILE) uv run python -m scripts.aws_leftovers
+
+aws-leftovers:
+	AWS_PROFILE=$(AWS_PROFILE) uv run python -m scripts.aws_leftovers

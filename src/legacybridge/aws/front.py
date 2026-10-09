@@ -139,3 +139,21 @@ def app_from_env() -> FastAPI:
         require_auth=True,
         default_profile=os.environ.get("LB_DEFAULT_PROFILE", "bedrock-claude"),
     )
+
+
+def make_handler(app: FastAPI) -> Callable[[dict[str, Any], Any], dict[str, Any]]:
+    """The Lambda handler for an HTTP API (payload format 2.0) in front of ``app``."""
+    from mangum import Mangum
+
+    return Mangum(app, lifespan="off")  # no startup work: the app is built before the first call
+
+
+_handler: Callable[[dict[str, Any], Any], dict[str, Any]] | None = None
+
+
+def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
+    """The Lambda entry point. The app is built on the first call, once per environment."""
+    global _handler
+    if _handler is None:
+        _handler = make_handler(app_from_env())
+    return _handler(event, context)

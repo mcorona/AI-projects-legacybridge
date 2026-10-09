@@ -12,6 +12,7 @@ dependencies = [
     "botocore[crt]>=1.43.110",
     "fastapi>=0.143.0",
     "httpx2[http2]>=2.13.1",
+    "mangum>=0.22.0",
     "mcp>=2.3.0",
     "openai>=3.26.1",
     "opentelemetry-exporter-otlp>=1.45.1",
@@ -51,6 +52,7 @@ select = ["E", "F", "I", "UP", "B"]
 "tests/*" = ["E501"]  # long SQL and payloads are clearer unwrapped
 "evals/swar_eval.py" = ["E501"]  # report text is clearer unwrapped
 "evals/report.py" = ["E501"]  # report text is clearer unwrapped
+"infra/*" = ["E501"]  # a CloudFormation-shaped stack reads better with its properties on one line
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]

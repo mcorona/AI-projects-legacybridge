@@ -1,0 +1,17 @@
+[project]
+name = "legacybridge-infra"
+version = "0.1.0"
+description = "CDK stack for the AWS deployment of LegacyBridge (ADR-014). Separate from the runtime so it adds nothing to the image."
+requires-python = ">=3.12"
+dependencies = [
+    "aws-cdk-lib>=2.250.0",
+    "constructs>=10.4.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.uv]
+package = false

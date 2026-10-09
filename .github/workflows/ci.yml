@@ -1,6 +1,6 @@
 # CI for LegacyBridge (Phase 6, ADR-013).
 #
-# Three independent jobs: lint, the test suite, and the eval gate. None of them needs a model, a
+# Four independent jobs: lint, the test suite, the eval gate and the AWS stack (ADR-014). None of them needs a model, a
 # secret or network access beyond fetching dependencies: the database is a throwaway Postgres on
 # the runner, seeded with the synthetic data (the passwords in .env.example are development
 # values for that database only).
@@ -90,3 +90,27 @@ jobs:
       - name: Database logs
         if: failure()
         run: docker compose logs --no-color legacy-db | tail -80
+
+  infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: infra/uv.lock
+      - name: CDK assertions (no AWS credentials, no deploy)
+        run: |
+          cd infra
+          uv sync --locked
+          uv run pytest -q
+      - name: Build the Lambda image (nothing is pushed)
+        run: docker build -t legacybridge-lambda .
+      - name: The image imports every handler
+        run: >
+          docker run --rm --entrypoint /var/lang/bin/python -e BEDROCK_CHAT_MODEL=ci legacybridge-lambda
+          -c "import legacybridge.aws.worker, legacybridge.aws.db_init, legacybridge.aws.front, scripts.seed"
