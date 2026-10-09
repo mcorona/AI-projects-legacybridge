@@ -24,10 +24,12 @@ class ProfileError(RuntimeError):
 
 class Profile(BaseModel):
     name: str
-    kind: Literal["openai_compat"]
-    base_url: str
+    kind: Literal["openai_compat", "bedrock_converse"]
+    base_url: str = ""  # openai_compat only
     model: str
     api_key: str | None = None
+    region: str | None = None  # bedrock_converse only
+    aws_profile: str | None = None  # None = the default credential chain (a Lambda role, env keys)
     max_tokens: int = 4096
     temperature: float = 0.0
     timeout_s: float = 300.0
@@ -57,6 +59,8 @@ def load_profile(
             raise ProfileError(f"profile {name!r} needs {var} (see .env.example)")
         return value
 
+    if raw.get("kind") == "bedrock_converse":
+        return _bedrock_profile(name, raw, env, need("model_env"))
     base_url, model = need("base_url_env"), need("model_env")
     api_key = None
     if "api_key_env" in raw:
@@ -65,6 +69,15 @@ def load_profile(
         if api_key.strip().lower() in PLACEHOLDER_KEYS:
             raise ProfileError(f"profile {name!r}: {var} still has the placeholder; set a real key")
     return Profile(name=name, base_url=base_url, model=model, api_key=api_key, **raw)
+
+
+def _bedrock_profile(name: str, raw: dict[str, Any], env: Mapping[str, str], model: str) -> Profile:
+    """Bedrock needs no URL or key: the region and the credentials come from the AWS environment
+    (a named profile on a laptop, the function's role in Lambda)."""
+    region = env.get(raw.pop("region_env", ""), "").strip() or raw.pop("default_region", None)
+    raw.pop("default_region", None)
+    aws_profile = env.get(raw.pop("aws_profile_env", ""), "").strip() or None
+    return Profile(name=name, model=model, region=region, aws_profile=aws_profile, **raw)
 
 
 def assert_data_allowed(profile: Profile, connect: Callable[..., Any] = default_connect) -> None:

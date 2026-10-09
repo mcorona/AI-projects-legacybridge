@@ -10,6 +10,7 @@ from legacybridge.agent.backends import McpToolBackend
 from legacybridge.agent.orchestrator import Agent
 from legacybridge.agent.schemas import AgentConfig
 from legacybridge.llm.base import LLMClient
+from legacybridge.llm.bedrock import BedrockConverseClient
 from legacybridge.llm.openai_compat import OpenAICompatClient
 from legacybridge.llm.profiles import assert_data_allowed, load_profile
 from legacybridge.mcp_server.tools import LegacyTools
@@ -21,6 +22,8 @@ def build_llm(profile_name: str) -> LLMClient:
     that sends data to third parties being pointed at a database that is not synthetic (ADR-010)."""
     profile = load_profile(profile_name)
     assert_data_allowed(profile)
+    if profile.kind == "bedrock_converse":
+        return BedrockConverseClient(profile)
     return OpenAICompatClient(profile)
 
 

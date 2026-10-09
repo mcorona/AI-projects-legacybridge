@@ -1,6 +1,5 @@
 # Runtime model profiles (ADR-003). Addresses, model names and keys come from environment
 # variables (see .env.example); everything else about a profile lives here.
-# bedrock-claude is added in Phase 7.
 profiles:
   local-qwen:                  # LM Studio, Qwen3.6-35B-A3B
     kind: openai_compat
@@ -26,5 +25,22 @@ profiles:
     retries: 3
     backoff_base_s: 2
     synthetic_data_only: true  # refuses to start against a database not marked synthetic
-    price_in_per_mtok: 0       # free tier. Real prices arrive with bedrock-claude in Phase 7,
-    price_out_per_mtok: 0      # copied from the AWS price list, never estimated here
+    price_in_per_mtok: 0       # free tier
+    price_out_per_mtok: 0
+  bedrock-claude:              # Amazon Bedrock Converse, Claude Haiku 4.5 (ADR-014)
+    kind: bedrock_converse
+    model_env: BEDROCK_CHAT_MODEL        # an inference profile id, e.g. us.anthropic.claude-haiku-4-5-20251001-v1:0
+    region_env: AWS_REGION
+    default_region: us-east-1
+    aws_profile_env: AWS_PROFILE         # empty in Lambda: the function's role is used
+    max_tokens: 4096
+    temperature: 0
+    timeout_s: 120
+    max_concurrency: 2
+    retries: 4
+    backoff_base_s: 1
+    # USD per million tokens, copied from the AWS Price List (AmazonBedrockFoundationModels,
+    # us-east-1, published 2026-10-08T23:56:37Z, read 2026-10-09): Claude Haiku 4.5, Regional
+    # (the us. inference profile is geographic; Global would be 1.00 / 5.00). Never estimated.
+    price_in_per_mtok: 1.10
+    price_out_per_mtok: 5.50
