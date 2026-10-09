@@ -334,3 +334,15 @@ def test_turning_xray_on_adds_one_endpoint_the_two_write_actions_and_the_switche
     assert [sorted(as_list(s["Action"])) for s in wildcard] == [
         ["xray:PutTelemetryRecords", "xray:PutTraceSegments"]
     ]
+
+
+def test_applying_the_guardrail_is_allowed_on_the_guardrail_and_its_cross_region_profile_only(
+    resources,
+):
+    """The first deploy was refused for lack of the profile: STANDARD routes through it."""
+    apply = [s for s in statements(resources) if "bedrock:ApplyGuardrail" in as_list(s["Action"])]
+    assert len(apply) == 1
+    arns = [json.dumps(r) for r in as_list(apply[0]["Resource"])]
+    assert len(arns) == 2 and any("guardrail-profile/us.guardrail.v1:0" in a for a in arns)
+    assert any("Guardrail" in a and "guardrail-profile" not in a for a in arns)
+    assert not any("*" in a for a in arns)

@@ -234,9 +234,18 @@ class LegacyBridgeStack(Stack):
             type="PROMPT_ATTACK", input_strength="HIGH", output_strength="NONE"
         )
         cross_region = None
+        self.guardrail_profile_arn: str | None = None
         if tier == "STANDARD":
+            # STANDARD routes between regions through a system-defined guardrail profile, and a
+            # caller needs ApplyGuardrail on that profile as well as on the guardrail (found at the
+            # first deploy: AccessDenied, and the agent correctly refused to answer without it).
+            region, account = self.region, self.account
+            self.guardrail_profile_arn = (
+                f"arn:aws:bedrock:{region}:{account}:guardrail-profile/us.guardrail.v1:0"
+            )
             cross_region = bedrock.CfnGuardrail.GuardrailCrossRegionConfigProperty(
-                guardrail_profile_arn=f"arn:aws:bedrock:{self.region}:{self.account}:guardrail-profile/us.guardrail.v1:0")  # fmt: skip
+                guardrail_profile_arn=self.guardrail_profile_arn
+            )
         self.guardrail = bedrock.CfnGuardrail(
             self, "Guardrail",
             name="legacybridge",
@@ -396,10 +405,11 @@ class LegacyBridgeStack(Stack):
         self.worker.add_to_role_policy(iam.PolicyStatement(
             actions=["bedrock:InvokeModel"],
             resources=model_resources(self.settings.model_id, self.region, self.account)))  # fmt: skip
+        guardrail_resources = [self.guardrail.attr_guardrail_arn]
+        if self.guardrail_profile_arn:
+            guardrail_resources.append(self.guardrail_profile_arn)
         self.worker.add_to_role_policy(
-            iam.PolicyStatement(
-                actions=["bedrock:ApplyGuardrail"], resources=[self.guardrail.attr_guardrail_arn]
-            )
+            iam.PolicyStatement(actions=["bedrock:ApplyGuardrail"], resources=guardrail_resources)
         )
         self.worker.add_to_role_policy(
             iam.PolicyStatement(
