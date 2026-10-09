@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, model_validator
 
 GOLDEN_PATH = Path(__file__).with_name("golden_set.yaml")
 HASH_PATTERN = re.compile(r"^(auto|sha256:[0-9a-f]{64})$")
-DEFECT_PATTERN = re.compile(r"^FAC-\d{2}$")
+DEFECT_PATTERN = re.compile(r"^(FAC|SIC)-\d{2}$")
 
 
 class Category(StrEnum):
@@ -71,7 +71,11 @@ EXPECTED_COUNTS = {
     Category.WRITE: 10,
 }
 # Columns lb_writer may UPDATE (db/init/02_roles.sh). Write cases must stay inside this set.
-WRITABLE = {"clientes": {"status", "telefono", "email"}, "productos": {"status"}}
+WRITABLE = {
+    "clientes": {"status", "telefono", "email"},
+    "productos": {"status"},
+    "invart": {"activo"},
+}
 
 
 class WriteChange(BaseModel):

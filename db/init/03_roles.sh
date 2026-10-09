@@ -14,14 +14,18 @@ GRANT USAGE ON SCHEMA public TO lb_reader, lb_writer;
 
 -- lb_reader: SELECT only. Defense in depth: even if the SQL guard fails, the database refuses writes.
 GRANT SELECT ON clientes, productos, faccab, facdet TO lb_reader;
+GRANT SELECT ON invart, invalm, invexi, invprv, invmov TO lb_reader;
 ALTER ROLE lb_reader SET statement_timeout = '5s';
 ALTER ROLE lb_reader SET default_transaction_read_only = on;
 
 -- lb_writer: used only by the human-approved write flow (Phase 4). It can read, and update a short
--- list of columns. No INSERT, no DELETE, no DDL, and no write access to invoices (faccab, facdet).
--- Removing a record is a logical delete (STATUS = 'B'), never a DELETE.
+-- list of columns. No INSERT, no DELETE, no DDL, and no write access to invoices (faccab, facdet)
+-- or to inventory movements and stock (invmov, invexi).
+-- Removing a record is a logical delete (STATUS = 'B' / ACTIVO = 'N'), never a DELETE.
 GRANT SELECT ON clientes, productos, faccab, facdet TO lb_writer;
+GRANT SELECT ON invart, invalm, invexi, invprv, invmov TO lb_writer;
 GRANT UPDATE (status, telefono, email) ON clientes TO lb_writer;
 GRANT UPDATE (status) ON productos TO lb_writer;
+GRANT UPDATE (activo) ON invart TO lb_writer;
 ALTER ROLE lb_writer SET statement_timeout = '5s';
 SQL

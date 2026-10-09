@@ -213,7 +213,7 @@ def _bad_date(rng: random.Random) -> str:
     return "00000000" if rng.random() < 0.6 else " " * 8
 
 
-def _rfc(rng: random.Random, person: bool) -> str:
+def random_rfc(rng: random.Random, person: bool) -> str:
     head = "".join(rng.choice(LETTERS) for _ in range(4 if person else 3))
     born = date(1950, 1, 1) + timedelta(days=rng.randrange(20000))
     tail = "".join(rng.choice(ALNUM) for _ in range(3))
@@ -268,10 +268,10 @@ def generate(seed: int = SEED) -> Dataset:
             )
         roll = rng.random()
         status = "A" if roll < 0.80 else ("I" if roll < 0.92 else "B")
-        rfc = _rfc(rng, person)
+        rfc = random_rfc(rng, person)
         old_rfc, change_day = None, None
         if rng.random() < P_RFC_CHANGED:
-            old_rfc = _rfc(rng, person)
+            old_rfc = random_rfc(rng, person)
             change_day = _day(rng, date(2002, 1, 1), date(2004, 12, 31))
         slug = "".join(ch for ch in name.lower() if ch.isalnum())[:20] or "cliente"
         clients.append(
@@ -318,7 +318,7 @@ def generate(seed: int = SEED) -> Dataset:
         orphan = rng.random() < P_ORPHAN_INVOICE
         if orphan:
             cliente = f"{N_CLIENTS + 1 + rng.randrange(50):010d}"
-            rfc = _rfc(rng, False)
+            rfc = random_rfc(rng, False)
         else:
             cliente = client["clave"]
             changed = client["old_rfc"] and day < client["change_day"]
@@ -521,16 +521,22 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="print counts, do not load")
     args = parser.parse_args()
 
-    ds = generate(args.seed)
-    if args.dry_run:
-        _print_report(ds)
-        return
+    # Imported here because scripts.seed_sicpt imports this module at top level.
     from legacybridge.db import connect
+    from scripts.seed_sicpt import SICPT_TABLES, generate_sicpt, load_sicpt
+    from scripts.seed_sicpt import defect_profile as sicpt_profile
 
-    with connect("admin") as conn:
-        load(ds, conn)
-    print(f"seed={args.seed} loaded")
+    ds = generate(args.seed)
+    inv = generate_sicpt(args.seed, ds.productos)
+    if not args.dry_run:
+        with connect("admin") as conn:
+            load(ds, conn)
+            load_sicpt(inv, conn)
+        print(f"seed={args.seed} loaded")
     _print_report(ds)
+    print("sicpt rows:", {t: len(getattr(inv, t)) for t in SICPT_TABLES})
+    for defect, counts in sicpt_profile(inv).items():
+        print(f"  {defect}: {counts}")
 
 
 if __name__ == "__main__":

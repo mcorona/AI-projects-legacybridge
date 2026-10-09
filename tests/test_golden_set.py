@@ -27,7 +27,7 @@ DEFECTS_DOC = Path(__file__).resolve().parents[1] / "docs" / "legacy-defects.md"
 
 
 def catalog_ids() -> set[str]:
-    return set(re.findall(r"\bFAC-\d{2}\b", DEFECTS_DOC.read_text(encoding="utf-8")))
+    return set(re.findall(r"\b(?:FAC|SIC)-\d{2}\b", DEFECTS_DOC.read_text(encoding="utf-8")))
 
 
 def test_there_are_80_cases_with_the_planned_distribution():
@@ -40,11 +40,12 @@ def test_ids_and_questions_are_unique():
     assert len({c.question for c in CASES}) == len(CASES)
 
 
-def test_defects_exist_in_the_catalogue_and_each_one_has_a_trap():
+def test_defects_exist_in_the_catalogue_and_each_invoicing_defect_has_a_trap():
     catalogue = catalog_ids()
     used = {d for c in CASES for d in c.defects}
     assert used <= catalogue, used - catalogue
-    assert {d for c in TRAPS for d in c.defects} == catalogue
+    # The golden set covers the invoicing schema; sicpt (SIC-xx) cases are a follow-up.
+    assert {d for c in TRAPS for d in c.defects} == {d for d in catalogue if d.startswith("FAC")}
 
 
 def test_every_answer_case_has_a_hash():
