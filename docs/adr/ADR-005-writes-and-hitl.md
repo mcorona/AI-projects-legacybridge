@@ -21,8 +21,18 @@ change business data on its own, but refusing every write makes the agent less u
   is the approval queue itself, not business data.
 - Removal is a logical delete (`status = 'B'`, `activo = 'N'`). No `DELETE`, no DDL, and no write
   access to invoices or inventory movements, at policy level and in the database grants.
-- **Phase 4** adds approval (`POST /approvals/{id}`), execution with `lb_writer`, and the audit
-  table. Until then a request stays `pending` forever.
+- **Approval and execution (Phase 4)** live outside the agent, in `ApprovalService`, behind
+  `POST /approvals/{id}` (bearer token, fail-closed if none is configured) and the
+  `legacybridge approvals` CLI. Neither is a tool the agent or the MCP server can call.
+  Approving is **one transaction** with `lb_writer`: lock the request (`FOR UPDATE`), require
+  `pending`, re-validate it against `policy` (the stored row is not trusted), recount the affected
+  rows and require them to match what was proposed (otherwise it is marked `failed`, because the
+  data changed since the proposal), run a parameterised `UPDATE`, check `rowcount`, and mark it
+  `executed`. The reviewer must not be the proposer.
+- **Audit is enforced by the database.** `lb_ops.audit_log` is filled by a `SECURITY DEFINER`
+  trigger on every insert and status change of `write_requests`. No application role can insert
+  into it, update it or delete from it, so the trail cannot be skipped or edited by code that has a
+  bug or by a model that has been steered.
 - `policy.WRITABLE` and the real privileges of `lb_writer` must match; a test compares them.
 
 ## Consequences
