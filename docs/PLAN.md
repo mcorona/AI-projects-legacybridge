@@ -2,7 +2,7 @@
 
 > **Reliable AI agents over legacy enterprise databases — secure, observable, and measured.**
 > Proyecto flagship de Manuel Corona para roles **AI Architect / AI Engineer** y práctica para **AWS Certified Generative AI Developer – Professional (AIP‑C01)**.
-> Repo: `mcoronap/AI-projects-legacybridge` · Licencia MIT · Ritmo estimado: ~15 h/semana → **7 semanas**.
+> Repo: `mcorona/AI-projects-legacybridge` · Licencia MIT · Ritmo estimado: ~15 h/semana → **7 semanas**.
 
 ---
 
@@ -369,17 +369,18 @@ Python 3.12 · `uv` · `mcp` (SDK oficial) · `sqlglot` · `psycopg` · `pydanti
 - [x] `docs/threat-model.md`: STRIDE + OWASP Top 10 for LLM Applications, mapeado a controles y tests *(7 fronteras STRIDE, OWASP LLM 2025 y los 45 ataques uno por uno; un test comprueba que lo que cita existe)*
 - [x] `docs/cost-model.md`: costo por pregunta y por mes (100 / 1k / 10k preguntas diarias) local vs Bedrock *(generado; encontró un defecto de costo en las métricas del tablero (55 series, ahora 15))*
 - [ ] 👤 Video demo de ≤3 min: pregunta trampa → el agente aplica la regla del defecto → ataque bloqueado → escritura con aprobación → traza en Phoenix/CloudWatch *(guion y comandos en `docs/demo/SCRIPT.md`; la demo sin modelo (GIF) ya está en el README)*
-- [~] Release `v1.0.0` con changelog *(`v1.0.0-rc1` preparado; falta la compuerta de publicación)*
+- [x] Release `v1.0.0` con changelog *(publicado como `v1.0.0-rc1`, pre-release: https://github.com/mcorona/AI-projects-legacybridge/releases/tag/v1.0.0-rc1; pasa a `v1.0.0` cuando valides el golden)*
 - [ ] 👤 Post en LinkedIn: *"Conecté un agente de IA a una base de datos legada con 18+ defectos reales. Esto es lo que aprendí sobre los errores silenciosos."* *(borradores EN/ES y la imagen de resultados en `~/LegacyBridge Portfolio/`)*
 - [ ] Agregar el repo a **Featured** y **Projects** en LinkedIn, y fijarlo (pin) en GitHub
 
 **DoD:** alguien sin contexto clona el repo y corre la demo local en menos de 10 minutos.
 
-**Estado (2026-10-09): preparada, falta publicar.** 954 tests en verde, CI en verde en cinco jobs (lint, tests, eval gate, infraestructura y el quickstart del README ejecutado tal cual en un runner limpio).
+**Estado (2026-10-09): publicada como `v1.0.0-rc1`; quedan tus tareas 👤.** 954 tests en verde, CI en verde en cinco jobs (lint, tests, eval gate, infraestructura y el quickstart del README ejecutado tal cual en un runner limpio).
 - **DoD medido:** clon limpio con caché de dependencias vacía y la imagen de Postgres ya descargada: `make db-up` 4 s, `make seed` 4 s, `make demo` 6 s y `make test` 121 s; **134 s en total**. Una primera vez suma la descarga de Postgres (≈ 660 MB sin comprimir).
 - **Hecho:** README (con GIF reproducible con `vhs`, resultados generados y metas contra lo medido: seguridad ✓, defect compliance ✓ por el mínimo (17/20, Sonnet), SWAR ✗ 13 % contra 5 %), arquitectura, modelo de amenazas, modelo de costos, ADR-008/009 e índice, CHANGELOG, demo sin modelo (`make demo`), resultados crudos versionados y pruebas de documentación (`make docs-check`).
 - **Auditoría previa a publicar:** historial completo (72 commits) sin claves, tokens, llaves privadas ni `.env`; el ID de la cuenta de AWS no aparece nunca. Única mención de un identificador: el ID de un guardrail **ya borrado** en dos commits (se agregó y se quitó); no se reescribió el historial.
-- **Falta (tuyo 👤):** confirmar la publicación; grabar el video; validar el golden set (→ `v1.0.0`); actualizar tu artículo, tu post y Upwork con la guía `v2-guia-de-actualizacion.md`; Featured/Projects y pin; la frase de presentación y el apartado de tesis de `docs/swar-method.md`.
+- **Publicación (con tu «sí» explícito):** la v1 se conservó en la rama `v1` y la etiqueta `v1-final` (commit `ddb0d9e`); `main` del repo público pasó a la v2 con `--force-with-lease` (`ddb0d9e → d273897`); descripción y temas actualizados (se quitó `pgvector`; se agregaron `opentelemetry`, `aws-cdk`, `human-in-the-loop`); release `v1.0.0-rc1` como pre-release. El CI pasa en los cinco jobs **en el repo público**, incluido el quickstart del README. El repo privado `AI-projects-legacybridge-agent` queda como respaldo (remoto `origin`; el público es `public`).
+- **Falta (tuyo 👤):** grabar el video; validar el golden set (→ `v1.0.0`); actualizar tu artículo, tu post y Upwork con la guía `v2-guia-de-actualizacion.md`; Featured/Projects y pin; la frase de presentación y el apartado de tesis de `docs/swar-method.md`.
 - **Decisión tomada:** la v2 **reemplaza** el contenido del repo público de la v1, que se conserva en la rama `v1` y la etiqueta `v1-final`. Las cifras de la v1 (95,4 %…) no son comparables con las de la v2 y el README lo dice.
 
 ---
