@@ -42,7 +42,8 @@ class LoopResult:
     queries: list[QueryRun] = field(default_factory=list)
     calls: list[ToolRecord] = field(default_factory=list)
     text: str = ""
-    reason: str = "no_finish"  # finished | max_steps | no_finish
+    reason: str = "no_finish"  # finished | finished_by_tool | max_steps | no_finish | llm_error
+    error: LLMError | None = None  # the model failed; what the tools already did is kept
 
 
 def compact(result: dict[str, Any], rows_to_model: int, query_id: str | None = None) -> str:
@@ -69,7 +70,10 @@ async def run_tool_loop(
     finish: ToolSpec,
     max_steps: int,
     rows_to_model: int,
+    stop_after_ok: frozenset[str] = frozenset(),
 ) -> LoopResult:
+    """Run tools until the model calls ``finish``. A tool in ``stop_after_ok`` ends the loop as soon
+    as it succeeds: its result is the whole outcome, so no further model call is needed."""
     messages = [Message.system(system), Message.user(user)]
     allowed = {t.name for t in tools}
     out = LoopResult()
@@ -79,7 +83,8 @@ async def run_tool_loop(
             response = await llm.chat(messages, [*tools, finish])
         except LLMError as error:
             rec.llm_error(role, error)  # a failed call is part of the trace too
-            raise
+            out.error, out.reason = error, "llm_error"
+            return out  # keep what the tools already did; the caller decides what that means
         rec.llm(role, response)
         out.text = response.text or out.text
         if not response.tool_calls:
@@ -134,5 +139,8 @@ async def run_tool_loop(
                     )  # fmt: skip
                 )
             messages.append(Message.tool(call, compact(result, rows_to_model, query_id)))
+            if ok and call.name in stop_after_ok:
+                out.reason = "finished_by_tool"
+                return out
     out.reason = "max_steps"
     return out

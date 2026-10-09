@@ -108,6 +108,8 @@ async def run_verifier(
         tools=[s for s in specs if s.name in VERIFIER_TOOLS], finish=SUBMIT_VERDICT,
         max_steps=config.verifier_steps, rows_to_model=config.rows_to_model,
     )  # fmt: skip
+    if loop.error is not None:
+        raise loop.error
     if loop.finish is None:
         return None
     f = loop.finish

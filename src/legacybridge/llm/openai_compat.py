@@ -27,6 +27,7 @@ from legacybridge.llm.profiles import Profile
 _THINK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 RETRYABLE = (openai.RateLimitError, openai.InternalServerError, openai.APIConnectionError)
 MAX_RETRY_AFTER_S = 60.0
+RETRY_TEMPERATURE = 0.4  # used when a retry follows an empty reply
 
 
 def strip_think(text: str) -> str:
@@ -133,6 +134,10 @@ class OpenAICompatClient:
                     return self._parse(response, started, reasons)
                 except (EmptyCompletion, *RETRYABLE) as error:
                     reasons.append(self._reason(error))
+                    if isinstance(error, EmptyCompletion):
+                        # At temperature 0 the same request gives the same empty reply, so retrying
+                        # it unchanged is wasted. A little randomness gets a different sample.
+                        request["temperature"] = max(request["temperature"], RETRY_TEMPERATURE)
                     if attempt >= self.profile.retries:
                         why = "; ".join(reasons)
                         raise LLMUnavailable(
@@ -164,9 +169,11 @@ class OpenAICompatClient:
             for i, c in enumerate(message.tool_calls or [])
         )
         if not text and not calls:
+            reasoning = (message.model_extra or {}).get("reasoning_content") or ""
+            tokens = response.usage.completion_tokens if response.usage else 0
             raise EmptyCompletion(
-                f"empty reply (finish_reason={choice.finish_reason or 'n/a'}); "
-                "a reasoning model may have spent its token budget"
+                f"empty reply (finish_reason={choice.finish_reason or 'n/a'}, {tokens} output "
+                f"tokens, {len(reasoning)} chars of reasoning)"
             )
         usage = response.usage
         return LLMResponse(
@@ -182,6 +189,8 @@ class OpenAICompatClient:
 
     @staticmethod
     def _reason(error: Exception) -> str:
+        if isinstance(error, EmptyCompletion):
+            return f"EmptyCompletion: {error}"
         status = getattr(error, "status_code", None)
         return f"{type(error).__name__}{f' {status}' if status else ''}"
 

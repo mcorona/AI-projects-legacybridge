@@ -120,7 +120,6 @@ async def test_a_write_request_is_queued_not_executed(tools, admin, untouched):
     writer = [
         call("run_query", sql="SELECT clave, nombre, status FROM clientes WHERE clave = '0000000100'"),
         call("propose_write", table="clientes", update={"status": "I"}, where={"clave": "0000000100"}),
-        answer("Listo, el cliente quedó inactivo.", evidence="q1"),
     ]  # fmt: skip
     llm = ScriptedLLM(
         planner=[plan("write", intent="deactivate customer 100")], writer=writer,
@@ -130,8 +129,8 @@ async def test_a_write_request_is_queued_not_executed(tools, admin, untouched):
 
     assert result.status == "pending_approval" and isinstance(result.request_id, int)
     assert result.preview[0]["clave"] == "0000000100"
-    # The status line is built by the agent; the model's "Listo, ya quedó" is not what the user reads.
-    assert "Listo" not in result.answer and "aprob" in result.answer.lower()
+    # The status line is built by the agent from the real result; the model is not asked to describe it.
+    assert "aprob" in result.answer.lower() and llm.left_over() == {}
     row = admin.execute(
         "SELECT status, requested_by FROM lb_ops.write_requests WHERE id = %s", (result.request_id,)
     ).fetchone()
@@ -283,7 +282,6 @@ async def test_a_verifier_that_gives_no_verdict_is_not_a_disagreement(tools):
 async def test_a_write_the_verifier_doubts_stays_pending_with_a_loud_warning(tools, untouched):
     writer = [
         call("propose_write", table="clientes", update={"status": "B"}, where={"estado": "GTO", "status": "I"}),
-        answer("Hecho", evidence=""),
     ]  # fmt: skip
     llm = ScriptedLLM(
         planner=[plan("write")], writer=writer, verifier=[disagrees("the user named one customer, not all of Guanajuato")]
@@ -480,3 +478,109 @@ def test_the_ontology_digest_is_short_and_comes_from_the_ontology():
     text = digest(ONTOLOGY)
     assert "2000 to 2005" in text and "facturas_vigentes [year]" in text
     assert "existencia_actual" in text and len(text) < 3500
+
+
+# --------------------------------------------------------------------------- found by running it live
+async def test_a_queued_request_ends_the_write_loop_without_asking_the_model_to_describe_it(
+    tools, untouched
+):
+    """Live, the model once returned nothing after propose_write succeeded. Nothing more is needed
+    from it: the outcome is the real result of the call."""
+    writer = [
+        call(
+            "propose_write",
+            table="clientes",
+            update={"email": "x@example.com"},
+            where={"clave": "0000000007"},
+        )
+    ]
+    llm = ScriptedLLM(planner=[plan("write")], writer=writer, verifier=[agrees()])
+    result = await ask(llm, tools, "Actualiza el correo del cliente 0000000007")
+    assert result.status == "pending_approval" and isinstance(result.request_id, int)
+    assert len(llm.sent("writer")) == 1, (
+        "one writer call: the model was not asked to submit anything"
+    )
+    assert untouched()
+
+
+async def test_a_verifier_failure_after_queuing_still_reports_the_request(tools, untouched):
+    """The request exists in the queue, so the result must say so, whatever happens afterwards."""
+    writer = [
+        call(
+            "propose_write", table="clientes", update={"status": "I"}, where={"clave": "0000000100"}
+        )
+    ]
+    llm = ScriptedLLM(planner=[plan("write")], writer=writer, verifier=[LLMUnavailable("down")])
+    result = await ask(llm, tools, "Marca como inactivo al cliente 0000000100.")
+    assert result.status == "pending_approval" and isinstance(result.request_id, int)
+    assert result.abstain_reason is None and result.verified is False
+    assert any("verifier could not run" in w for w in result.warnings)
+    assert untouched()
+
+
+async def test_a_model_failure_before_anything_was_queued_is_still_an_honest_abstention(
+    tools, untouched
+):
+    writer = [
+        call("run_query", sql="SELECT clave FROM clientes WHERE clave = '0000000100'"),
+        LLMUnavailable("down"),
+    ]
+    result = await ask(
+        ScriptedLLM(planner=[plan("write")], writer=writer), tools, "Da de baja al cliente 100"
+    )
+    assert (result.status, result.abstain_reason, result.request_id) == (
+        "abstained",
+        "llm_error",
+        None,
+    )
+    assert untouched()
+
+
+async def test_the_tool_loop_keeps_what_the_tools_did_when_the_model_fails(tools):
+    from legacybridge.agent.events import Recorder
+    from legacybridge.agent.loop import run_tool_loop
+    from legacybridge.agent.roles.sql_writer import SUBMIT_ANSWER
+
+    llm = ScriptedLLM(writer=[call("run_query", sql=METRIC_2004), LLMUnavailable("down")])
+    async with McpToolBackend.in_memory(tools) as backend:
+        specs = await backend.list_tools()
+        out = await run_tool_loop(
+            llm=llm, backend=backend, rec=Recorder(), role="sql_writer",
+            system="You answer ONE question (test)", user="q", tools=specs, finish=SUBMIT_ANSWER,
+            max_steps=5, rows_to_model=30,
+        )  # fmt: skip
+    assert out.reason == "llm_error" and isinstance(out.error, LLMUnavailable)
+    assert [c.name for c in out.calls] == ["run_query"] and out.queries[0].rows == [[829]]
+
+
+async def test_a_queued_request_survives_a_model_failure_in_the_writer(monkeypatch):
+    """Defence in depth: even if the loop ends in a model error, a request that was queued is kept."""
+    from legacybridge.agent.events import Recorder
+    from legacybridge.agent.loop import LoopResult, ToolRecord
+    from legacybridge.agent.roles import sql_writer
+    from legacybridge.agent.roles.planner import PlannerDecision
+
+    queued = {
+        "ok": True,
+        "request_id": 77,
+        "table": "clientes",
+        "update": {},
+        "where": {},
+        "affected_rows": 1,
+    }
+
+    async def fake_loop(**kwargs):
+        return LoopResult(
+            calls=[ToolRecord("propose_write", {}, queued)],
+            error=LLMUnavailable("down"),
+            reason="llm_error",
+        )
+
+    monkeypatch.setattr(sql_writer, "run_tool_loop", fake_loop)
+    out = await sql_writer.run_writer(
+        llm=None, backend=None, rec=Recorder(), specs=[], question="q", plan=PlannerDecision(action="write"),
+        digest_text="", mode="write", config=AgentConfig(),
+    )  # fmt: skip
+    assert out.proposal["request_id"] == 77 and any(
+        "failed after the request was queued" in n for n in out.notes
+    )

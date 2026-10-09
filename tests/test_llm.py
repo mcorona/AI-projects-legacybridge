@@ -133,7 +133,25 @@ async def test_retry_after_is_capped():
 async def test_an_empty_reply_is_retried_then_succeeds():
     client, _, calls = make([reply("<think>only thinking</think>", finish="length"), reply("ok")])
     out = await client.chat(HI)
-    assert out.text == "ok" and len(calls) == 2 and out.retries == ["EmptyCompletion"]
+    assert out.text == "ok" and len(calls) == 2
+    assert out.retries[0].startswith("EmptyCompletion: empty reply (finish_reason=length")
+
+
+async def test_an_empty_reply_is_retried_with_a_different_sample_not_the_same_request():
+    import json
+
+    client, _, calls = make([reply(""), reply(""), reply("ok")], temperature=0.0)
+    out = await client.chat(HI)
+    sent = [json.loads(c.content)["temperature"] for c in calls]
+    assert sent == [0.0, 0.4, 0.4] and out.text == "ok"
+
+
+async def test_an_empty_reply_says_what_happened():
+    client, _, _ = make([reply("", finish="stop", usage=(5, 0))] * 2, retries=1)
+    with pytest.raises(LLMUnavailable) as raised:
+        await client.chat(HI)
+    text = str(raised.value)
+    assert "EmptyCompletion: empty reply (finish_reason=stop, 0 output tokens" in text
 
 
 async def test_gives_up_after_the_profile_retries_with_every_reason():

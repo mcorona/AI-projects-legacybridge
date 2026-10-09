@@ -89,6 +89,9 @@ async def run_writer(
         llm=llm, backend=backend, rec=rec, role="sql_writer", system=system, user=user,
         tools=tools_for(specs, mode), finish=SUBMIT_ANSWER, max_steps=config.max_steps,
         rows_to_model=config.rows_to_model,
+        # A queued request is the whole outcome of a write: the status line is built from the real
+        # result, so asking the model to describe it adds a call and a way to fail.
+        stop_after_ok=frozenset({WRITE_TOOL}) if mode == "write" else frozenset(),
     )  # fmt: skip
 
     out = WriterOutcome(outcome="no_finish", queries=loop.queries, loop_reason=loop.reason)
@@ -103,6 +106,15 @@ async def run_writer(
     out.definitional = not loop.queries and any(
         c.name == "explain_business_term" and c.result.get("ok") is True for c in loop.calls
     )
+    if loop.error is not None:
+        if out.proposal is None:
+            raise loop.error  # nothing useful was done before the model failed
+        out.notes.append(f"The model failed after the request was queued: {str(loop.error)[:160]}")
+        out.outcome = "answer"
+        return out
+    if out.proposal is not None and loop.finish is None:
+        out.outcome = "answer"  # the queued request is the outcome
+        return out
     finish = loop.finish
     if finish is None:
         out.answer = loop.text
