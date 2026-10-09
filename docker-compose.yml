@@ -8,6 +8,7 @@ services:
       POSTGRES_DB: legacy
       LB_READER_PASSWORD: ${LB_READER_PASSWORD:?copy .env.example to .env}
       LB_WRITER_PASSWORD: ${LB_WRITER_PASSWORD:?copy .env.example to .env}
+      LB_PROPOSER_PASSWORD: ${LB_PROPOSER_PASSWORD:?copy .env.example to .env}
     ports:
       # Loopback only. LegacyBridge v1 uses 5433, so both can run side by side.
       - "127.0.0.1:5434:5432"

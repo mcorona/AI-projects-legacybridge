@@ -4,12 +4,14 @@
 set -euo pipefail
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
-  -v reader_pw="$LB_READER_PASSWORD" -v writer_pw="$LB_WRITER_PASSWORD" <<'SQL'
+  -v reader_pw="$LB_READER_PASSWORD" -v writer_pw="$LB_WRITER_PASSWORD" \
+  -v proposer_pw="$LB_PROPOSER_PASSWORD" <<'SQL'
 CREATE ROLE lb_reader LOGIN PASSWORD :'reader_pw';
 CREATE ROLE lb_writer LOGIN PASSWORD :'writer_pw';
+CREATE ROLE lb_proposer LOGIN PASSWORD :'proposer_pw';
 
 REVOKE ALL ON DATABASE legacy FROM PUBLIC;
-GRANT CONNECT ON DATABASE legacy TO lb_reader, lb_writer;
+GRANT CONNECT ON DATABASE legacy TO lb_reader, lb_writer, lb_proposer;
 GRANT USAGE ON SCHEMA public TO lb_reader, lb_writer;
 
 -- lb_reader: SELECT only. Defense in depth: even if the SQL guard fails, the database refuses writes.
@@ -28,4 +30,8 @@ GRANT UPDATE (status, telefono, email) ON clientes TO lb_writer;
 GRANT UPDATE (status) ON productos TO lb_writer;
 GRANT UPDATE (activo) ON invart TO lb_writer;
 ALTER ROLE lb_writer SET statement_timeout = '5s';
+
+-- lb_proposer: queues write requests for human approval (ADR-005). It gets no access to business
+-- data; its only grants are on lb_ops.write_requests (db/init/04_ops.sql).
+ALTER ROLE lb_proposer SET statement_timeout = '5s';
 SQL
