@@ -7,6 +7,7 @@ Every method returns a JSON-able dict that says what happened (``ok``, ``stage``
 from __future__ import annotations
 
 import difflib
+import os
 import time
 from collections.abc import Callable
 from typing import Any
@@ -22,6 +23,7 @@ from legacybridge.jsonable import to_json_value
 from legacybridge.mcp_server.schema import Schema, schema_from_db
 from legacybridge.mcp_server.sql_guard import GuardResult, validate
 from legacybridge.semantic.defect_rules import Checker, Violation
+from legacybridge.semantic.knowledge import KnowledgeBase
 from legacybridge.semantic.loader import Ontology, load_ontology
 
 Connect = Callable[..., psycopg.Connection]
@@ -45,6 +47,15 @@ def _error_type(e: Exception) -> str:
     return type(e).__name__
 
 
+def _kb_from_env() -> KnowledgeBase | None:
+    """The Bedrock knowledge base named by LB_KB_ID. The SDK is only imported when it is set."""
+    if not os.environ.get("LB_KB_ID", "").strip():
+        return None
+    from legacybridge.llm.bedrock_kb import kb_from_env
+
+    return kb_from_env()
+
+
 def _failure(stage: str, reason: str, detail: str = "", hint: str = "", **extra: Any) -> dict:
     out = {"ok": False, "stage": stage, "reason": reason}
     if detail:
@@ -55,9 +66,15 @@ def _failure(stage: str, reason: str, detail: str = "", hint: str = "", **extra:
 
 
 class LegacyTools:
-    def __init__(self, connect: Connect = default_connect, ontology: Ontology | None = None):
+    def __init__(
+        self,
+        connect: Connect = default_connect,
+        ontology: Ontology | None = None,
+        knowledge_base: KnowledgeBase | None = None,
+    ):
         self._connect = connect
         self.ontology = ontology or load_ontology()
+        self.knowledge_base = knowledge_base if knowledge_base is not None else _kb_from_env()
         self._schema: Schema | None = None
 
     # ------------------------------------------------------------------ schema
@@ -289,17 +306,34 @@ class LegacyTools:
             return err
         return self.run_query(f"SELECT * FROM {table} LIMIT {n}", max_rows=n)
 
+    def _documentation(self, term: str) -> list[dict]:
+        """Passages of documentation for a term the ontology does not know. Never raises: the
+        knowledge base is an extra, so an outage must not break the tool."""
+        if self.knowledge_base is None:
+            return []
+        try:
+            return [
+                {"text": p.text, "source": p.source, "score": p.score}
+                for p in self.knowledge_base.retrieve(term)
+            ]
+        except Exception:
+            return []
+
     def explain_business_term(self, term: str) -> dict:
         """Answer from the ontology: a metric, term, entity, defect id or join."""
         found = self.ontology.resolve(term)
         if found is None:
             suggestions = self.ontology.suggest(term)
+            passages = self._documentation(term)
+            hint = f"Did you mean {', '.join(suggestions)}?" if suggestions else "No such term."
+            if passages:
+                hint += (
+                    " Documentation passages follow: they are not canonical definitions, so "
+                    "confirm columns with describe_table before using them in SQL."
+                )
+            extra = {"passages": passages, "passages_source": "knowledge_base"} if passages else {}
             return _failure(
-                "ontology",
-                "unknown_term",
-                term[:60],
-                f"Did you mean {', '.join(suggestions)}?" if suggestions else "No such term.",
-                suggestions=suggestions,
+                "ontology", "unknown_term", term[:60], hint, suggestions=suggestions, **extra
             )
         o = self.ontology
         item = found.item
