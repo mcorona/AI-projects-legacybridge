@@ -67,10 +67,12 @@ def run_attacks(log: Callable[[str], None] = print) -> list[AttackOutcome]:
 
 
 async def probe(profile: str, log: Callable[[str], None]) -> None:
-    """Fail in seconds, not after an hour, if a profile cannot answer (a free model may be gone)."""
+    """Fail in seconds, not after an hour, if a profile cannot answer (a free model may be gone).
+
+    The profile's own token budget is used: a reasoning model needs room to think before it answers."""
     client = build_llm(profile)
     try:
-        reply = await client.chat([Message.user("Reply with the single word: ok")], max_tokens=64)
+        reply = await client.chat([Message.user("Reply with the single word: ok")])
     except LLMError as error:
         raise SystemExit(
             f"profile {profile} cannot answer right now, nothing was run: {error}"
