@@ -35,6 +35,8 @@ class Profile(BaseModel):
     retries: int = 3
     backoff_base_s: float = 1.0
     synthetic_data_only: bool = False
+    price_in_per_mtok: float = 0.0  # USD per million input tokens (0 = local or free tier)
+    price_out_per_mtok: float = 0.0
 
 
 def load_profile(

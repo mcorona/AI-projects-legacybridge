@@ -12,6 +12,8 @@ profiles:
     max_concurrency: 1         # one local GPU
     retries: 2
     backoff_base_s: 1
+    price_in_per_mtok: 0       # runs on this machine
+    price_out_per_mtok: 0
   omniroute-free:              # free-tier model combo behind OmniRoute (ADR-010)
     kind: openai_compat
     base_url_env: OMNIROUTE_BASE_URL     # http://localhost:20128/v1
@@ -24,3 +26,5 @@ profiles:
     retries: 3
     backoff_base_s: 2
     synthetic_data_only: true  # refuses to start against a database not marked synthetic
+    price_in_per_mtok: 0       # free tier. Real prices arrive with bedrock-claude in Phase 7,
+    price_out_per_mtok: 0      # copied from the AWS price list, never estimated here

@@ -13,219 +13,46 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
-import math
 import sys
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import yaml
-from pydantic import BaseModel
 
 from evals.golden import Behavior, GoldenCase, load_golden
 from evals.labels import label_run
-from legacybridge.agent.backends import McpToolBackend
-from legacybridge.agent.factory import open_agent
-from legacybridge.agent.orchestrator import Agent
-from legacybridge.agent.schemas import AgentConfig, AgentResult
+from evals.metrics import (  # noqa: F401 - re-exported
+    Confusion,
+    confusion,
+    population,
+    wilson,
+)
+from evals.runner import (  # noqa: F401 - re-exported
+    RESULTS,
+    Record,
+    describe_rows,
+    load_records,
+    run_golden,
+    run_oracle,
+)
+from legacybridge.agent.schemas import AgentResult
 from legacybridge.db import connect
-from legacybridge.llm.base import LLMResponse, Message, ToolCall, ToolSpec
-from legacybridge.mcp_server.tools import LegacyTools
 from legacybridge.observability.swar_config import SwarConfig, load_swar_config
 from legacybridge.observability.swar_detector import assess, combine, facts_from_result, risk_at
 from legacybridge.semantic.loader import Ontology, load_ontology
 
 ROOT = Path(__file__).resolve().parent
 SUBSET_PATH = ROOT / "swar_subset.yaml"
-RESULTS = ROOT / "results"
 REPORTS = ROOT / "reports"
 THRESHOLDS = (0.3, 0.5, 0.7)
 STATIC_SIGNALS = {"unresolved_violations", "question_defect_violated", "unstated_parameter"}
 RULE_SIGNALS = {"unresolved_violations", "question_defect_violated"}
-TABLES = ("clientes", "productos", "faccab", "facdet", "invart", "invexi", "invmov", "invprv")
-
-
-class Record(BaseModel):
-    case_id: str
-    category: str
-    variant: str  # live | oracle-expected | oracle-naive
-    profile: str
-    result: AgentResult
-    kind: str
-    reason: str
 
 
 def load_subset(path: Path = SUBSET_PATH) -> list[GoldenCase]:
     golden = {c.id: c for c in load_golden()}
     ids = yaml.safe_load(path.read_text(encoding="utf-8"))["cases"]
     return [golden[i] for i in ids]
-
-
-def fingerprint(conn) -> list[str]:
-    return [
-        conn.execute(
-            f"SELECT md5(string_agg(t::text, '|' ORDER BY t::text)) FROM {t} t"
-        ).fetchone()[0]
-        for t in TABLES
-    ]
-
-
-def _cleanup_requests(first_id: int) -> None:
-    with connect("admin") as conn:
-        conn.execute("DELETE FROM lb_ops.write_requests WHERE id > %s", (first_id,))
-        conn.commit()
-
-
-def _max_request_id() -> int:
-    with connect("admin") as conn:
-        value = conn.execute("SELECT coalesce(max(id), 0) FROM lb_ops.write_requests").fetchone()[0]
-        conn.rollback()
-        return value
-
-
-# ============================================================================ live
-async def run_live(
-    profile: str,
-    cases: list[GoldenCase],
-    out: Path,
-    *,
-    backend: str = "local",
-    action: str = "annotate",
-    escalation_profile: str | None = None,
-    log: Callable[[str], None] = print,
-) -> list[Record]:
-    done = (
-        {json.loads(line)["case_id"] for line in out.read_text().splitlines()}
-        if out.exists()
-        else set()
-    )
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with connect("admin") as admin:
-        before = fingerprint(admin)
-        admin.rollback()
-    records: list[Record] = []
-    async with open_agent(
-        profile,
-        backend=backend,
-        config=AgentConfig(swar_action=action),
-        escalation_profile=escalation_profile,
-    ) as agent:
-        with connect("reader", autocommit=True) as reader:
-            for n, case in enumerate(cases, 1):
-                if case.id in done:
-                    log(f"[{n}/{len(cases)}] {case.id}: already in {out.name}, skipped")
-                    continue
-                first_id = _max_request_id()
-                result = await agent.ask(case.question)
-                label = label_run(case, result, reader)
-                _cleanup_requests(first_id)
-                rec = Record(
-                    case_id=case.id, category=case.category.value, variant="live", profile=profile,
-                    result=result, kind=label.kind, reason=label.reason,
-                )  # fmt: skip
-                with out.open("a", encoding="utf-8") as fh:
-                    fh.write(rec.model_dump_json() + "\n")
-                records.append(rec)
-                log(
-                    f"[{n}/{len(cases)}] {case.id:11} {result.status:20} risk {result.swar_risk:.2f} "
-                    f"{result.swar_level:8} -> {label.kind} ({label.reason[:50]}) "
-                    f"{result.usage.ms / 1000:.0f}s"
-                )
-    with connect("admin") as admin:
-        after = fingerprint(admin)
-        admin.rollback()
-    if before != after:
-        raise RuntimeError("business data changed during the evaluation: this must never happen")
-    return load_records(out)
-
-
-# ============================================================================ oracle baseline
-class _Oracle:
-    """A model that executes one given SQL and reports its rows: no LLM, so no model noise.
-
-    It lets the real orchestrator, tools and detector see a run whose SQL we control. The verifier
-    re-runs the same SQL and agrees, so what is measured is the static signals only."""
-
-    name = "oracle"
-
-    def __init__(self, sql: str, answer: str):
-        self.sql, self.answer = sql, answer
-        self._writer = 0
-        self._verifier = 0
-
-    @staticmethod
-    def _calls(*pairs: tuple[str, dict[str, Any]]) -> LLMResponse:
-        calls = tuple(ToolCall(f"c{i}", n, a) for i, (n, a) in enumerate(pairs))
-        return LLMResponse(text="", tool_calls=calls, model="oracle", stop_reason="tool_calls")
-
-    async def chat(self, messages: list[Message], tools: list[ToolSpec] | None = None, **kw: Any):
-        head = messages[0].content
-        if head.startswith("You are the planner"):
-            return LLMResponse(
-                text=json.dumps({"action": "query", "language": "es", "intent": "oracle"}),
-                model="oracle",
-            )
-        if head.startswith("You answer ONE question"):
-            self._writer += 1
-            if self._writer == 1:
-                return self._calls(("run_query", {"sql": self.sql}))
-            return self._calls(
-                (
-                    "submit_answer",
-                    {"answer": self.answer, "outcome": "answer", "evidence_query": "q1"},
-                )
-            )
-        self._verifier += 1
-        if self._verifier == 1:
-            return self._calls(("run_query", {"sql": self.sql}))
-        return self._calls(("submit_verdict", {"agrees": True, "confidence": 0.9, "issues": []}))
-
-
-def _describe_rows(rows: list[list[Any]]) -> str:
-    return "Resultado: " + "; ".join(", ".join(str(c) for c in row) for row in rows[:5])
-
-
-async def run_oracle(
-    cases: Iterable[GoldenCase], log: Callable[[str], None] = print
-) -> list[Record]:
-    tools = LegacyTools()
-    records: list[Record] = []
-    with connect("reader", autocommit=True) as reader:
-        async with McpToolBackend.in_memory(tools) as backend:
-            for case in cases:
-                if case.expected_behavior != Behavior.ANSWER:
-                    continue
-                variants = [("oracle-expected", case.expected_sql)]
-                if case.naive_sql:
-                    variants.append(("oracle-naive", case.naive_sql))
-                for variant, sql in variants:
-                    probe = tools.run_query(sql, max_rows=500)
-                    if not probe["ok"]:  # a rejected or failing query is a loud failure, not SWAR
-                        log(
-                            f"{case.id} {variant}: skipped ({probe.get('stage')}/{probe.get('reason')})"
-                        )
-                        continue
-                    agent = Agent(
-                        _Oracle(sql, _describe_rows(probe["rows"])), backend,
-                        config=AgentConfig(swar_action="annotate"),
-                    )  # fmt: skip
-                    result = await agent.ask(case.question)
-                    label = label_run(case, result, reader)
-                    records.append(
-                        Record(
-                            case_id=case.id,
-                            category=case.category.value,
-                            variant=variant,
-                            profile="oracle",
-                            result=result,
-                            kind=label.kind,
-                            reason=label.reason,
-                        )  # fmt: skip
-                    )
-    return records
 
 
 def relabel(records: list[Record]) -> list[Record]:
@@ -276,60 +103,7 @@ def rescore(
     return out
 
 
-def load_records(path: Path) -> list[Record]:
-    return [
-        Record.model_validate_json(line) for line in path.read_text().splitlines() if line.strip()
-    ]
-
-
 # ============================================================================ metrics
-def wilson(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    """95% Wilson score interval; (0, 1) when there is nothing to estimate from."""
-    if n == 0:
-        return 0.0, 1.0
-    p = successes / n
-    denom = 1 + z * z / n
-    centre = (p + z * z / (2 * n)) / denom
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
-    return max(0.0, centre - half), min(1.0, centre + half)
-
-
-@dataclass
-class Confusion:
-    tp: int = 0
-    fp: int = 0
-    fn: int = 0
-    tn: int = 0
-
-    @property
-    def precision(self) -> float | None:
-        return self.tp / (self.tp + self.fp) if self.tp + self.fp else None
-
-    @property
-    def recall(self) -> float | None:
-        return self.tp / (self.tp + self.fn) if self.tp + self.fn else None
-
-
-def population(records: list[Record]) -> list[Record]:
-    """What the detector is about: delivered answers whose label is known."""
-    return [
-        r for r in records
-        if r.result.status in ("answered", "pending_approval")
-        and r.kind in ("correct", "silently_wrong")
-    ]  # fmt: skip
-
-
-def confusion(rows: list[tuple[float, bool]], threshold: float) -> Confusion:
-    c = Confusion()
-    for risk, wrong in rows:
-        flagged = risk >= threshold
-        if wrong:
-            c.tp, c.fn = c.tp + flagged, c.fn + (not flagged)
-        else:
-            c.fp, c.tn = c.fp + flagged, c.tn + (not flagged)
-    return c
-
-
 def risk_with(
     result: AgentResult, cfg: SwarConfig, keep: set[str] | None, drop: set[str] | None = None
 ) -> float:
@@ -578,8 +352,8 @@ def main(argv: list[str] | None = None) -> int:
     RESULTS.mkdir(parents=True, exist_ok=True)
     out = args.out or RESULTS / f"swar-{args.profile}-{args.action}-{_stamp()}.jsonl"
     records = asyncio.run(
-        run_live(args.profile, cases, out, backend=args.backend, action=args.action,
-                 escalation_profile=args.escalation_profile)
+        run_golden(args.profile, cases, out, backend=args.backend, action=args.action,
+                   escalation_profile=args.escalation_profile)
     )  # fmt: skip
     name = args.name or args.profile
     print(f"results: {out}\nwrote {write_report(build_report(records, name), name)}")
