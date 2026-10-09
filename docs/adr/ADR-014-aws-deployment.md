@@ -298,3 +298,22 @@ question was asked, and the stack was destroyed.
 - **Latency.** The first question after a cold start took 34 s (against 18 s warm on the earlier
   deployment), with the extra endpoint and a cold container in the VPC.
 
+### 2026-10-09, end of the day: what still exists in the account, and what it costs
+
+After the second destroy (again about 25 minutes for the VPC Lambda network interfaces) the account
+was checked directly, without relying on the tag index: no RDS instance, VPC endpoint, VPC, NAT
+gateway, guardrail, knowledge base, secret (not even one scheduled for deletion), DynamoDB table,
+Lambda function or project S3 bucket. Two things that cost money were still there and were removed:
+four images (about 250 MB each) in the CDK assets repository, and two empty log groups that the
+bucket-emptying helper function creates at run time (CloudFormation does not own them).
+
+What remains, on purpose or because it cannot be removed:
+
+- **`CDKToolkit`**, the shared bootstrap stack: a 296 KB bucket, an empty image repository and roles.
+  No recurring cost worth the name. Not removed: other CDK stacks would need it.
+- **Transaction Search**, on at 1% indexing: no cost without traffic.
+- **The `LegacyBridge` custom metrics** that the per-question EMF records created in CloudWatch.
+  They cannot be deleted; CloudWatch stops billing a custom metric after it has had no data for a
+  while, and these were 33 series from about two hours of use, so the cost is a few dollars at most
+  and shrinks to zero by itself.
+
