@@ -84,7 +84,7 @@ def profile_table(run: report.Run, summaries: dict) -> list[str]:
         "Silently wrong²",
         "Defect traps (20)",
         "Cost / question",
-        "Latency p50",
+        "Latency p50³",
     ]
     return report.table(head, rows)
 
@@ -194,7 +194,11 @@ def build_block(archive: Path = ARCHIVE, run_id: str = RUN_ID) -> str:
     lines = [START, "", *profile_table(run, summaries)]
     lines += [
         "¹ Delivered answers with confidence ≥ 0.8 that are wrong. "
-        "² Delivered answers that are wrong, at any confidence.",
+        "² Delivered answers that are wrong, at any confidence. "
+        "³ Wall-clock seconds per question, one at a time, on the author's laptop (MacBook Pro, "
+        "Apple M5 Max, 36 GB); Bedrock and OmniRoute include the network, so the local and cloud "
+        "figures are not comparable: "
+        "[`docs/measurement-environment.md`](docs/measurement-environment.md).",
         "",
         f"One run per model over the 80 golden cases ({report.REVIEW_STATE}). Run `{run_id}`, raw "
         f"results in `evals/archive/{run_id}/`.",

@@ -324,7 +324,10 @@ def render(archive: Path = ARCHIVE, prices_path: Path = PRICES) -> str:
         "## Assumptions",
         "",
         f"- The mean latency of the run is the time a worker is busy; a client polls every "
-        f"{POLL_SECONDS:g} s.",
+        f"{POLL_SECONDS:g} s. The latencies were measured on the author's laptop, so the Bedrock "
+        "ones include the network between the laptop and the region; a worker inside the region "
+        "would not pay that leg, which was not measured over the full set "
+        "(`docs/measurement-environment.md`).",
         f"- A result is about 20 KB in DynamoDB: {DYNAMO_WRITE_UNITS} write units and "
         f"{DYNAMO_READ_UNITS_PER_POLL} read units a poll.",
         f"- The guardrail is called {GUARDRAIL_CALLS} times a question (the question; the answer and "

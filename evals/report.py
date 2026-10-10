@@ -36,8 +36,8 @@ ABLATION_PROFILE = "local-qwen"
 GOLDEN = {c.id: c for c in load_golden()}
 APPROVED = all_approved(GOLDEN.values())
 REVIEW_STATE = (
-    f"`review: approved`: validated by the author on {APPROVED_ON}, after the run and without "
-    "changing any expected answer"
+    f"`review: approved`: reviewed by a person, its author, on {APPROVED_ON}, after the run and "
+    "without changing any expected answer"
     if APPROVED
     else "`review: draft`, not yet validated by a person"
 )
@@ -127,6 +127,9 @@ def provenance(run: Run) -> list[str]:
         f"- Cases: **{len(GOLDEN)}** golden ({REVIEW_STATE}) and "
         f"**{len(run.attacks) if run.attacks else 0}** attacks. One run per arm: run-to-run noise is "
         "not measured and the intervals do not include it.",
+        "- Timings: wall-clock seconds per question, one question at a time, on the author's laptop "
+        "(Bedrock and OmniRoute figures include the network); machine and conditions in "
+        "`docs/measurement-environment.md`.",
     ]
     for profile in run.profiles:
         served = models_used(run.records(profile)) or ["unknown"]
@@ -454,8 +457,8 @@ READING_NOTES = [
     "- **Small samples.** 80 cases split into six categories: a category of 5 cannot be told from "
     "chance. The intervals are 95% Wilson and say how little a proportion pins down.",
     (
-        f"- **One reviewer.** `review: approved` on all 80 cases since {APPROVED_ON}: the author "
-        "validated them after the run and changed none. It is the author's reading of the "
+        f"- **One human reviewer.** `review: approved` on all 80 cases since {APPROVED_ON}: a "
+        "person, the author, reviewed them after the run and changed none. It is the author's reading of the "
         "questions, not an independent benchmark, so accuracy is as good as that reading."
         if APPROVED
         else "- **The golden set is a draft.** `review: draft` on all 80 cases: no person has "

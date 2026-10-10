@@ -177,3 +177,16 @@ def test_the_mix_of_questions_the_readme_describes_is_the_golden_sets():
         "15 simple, 20 joins and aggregates, 20 traps, 10 ambiguous, 5 out of scope and 10 writes"
         in flat
     )
+
+
+def test_every_timing_in_the_results_table_is_explained_in_the_measurement_environment():
+    doc = (ROOT / "docs" / "measurement-environment.md").read_text(encoding="utf-8")
+    block = README.split("<!-- results:start -->")[1].split("<!-- results:end -->")[0]
+    table = [ln for ln in block.splitlines() if ln.startswith("| `")][:5]
+    latencies = [row.strip("| ").split("|")[-1].strip() for row in table]
+    assert len(latencies) == 5 and all(x.endswith(" s") for x in latencies), latencies
+    for value in latencies:
+        assert value in doc, (
+            f"{value} is in the README table but not in docs/measurement-environment.md"
+        )
+    assert "Apple M5 Max" in doc and "Apple M5 Max" in README

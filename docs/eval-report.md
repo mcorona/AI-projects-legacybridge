@@ -1,8 +1,9 @@
 # Evaluation report 20261009
 
-- Run id **20261009**; generated 2026-10-10 00:18 UTC.
+- Run id **20261009**; generated 2026-10-10 00:33 UTC.
 - Commits the runs were made at: 16ca7a5, 17f3585, 4b3c5ab, c88ba0f, eced896.
-- Cases: **80** golden (`review: approved`: validated by the author on 2026-10-09, after the run and without changing any expected answer) and **45** attacks. One run per arm: run-to-run noise is not measured and the intervals do not include it.
+- Cases: **80** golden (`review: approved`: reviewed by a person, its author, on 2026-10-09, after the run and without changing any expected answer) and **45** attacks. One run per arm: run-to-run noise is not measured and the intervals do not include it.
+- Timings: wall-clock seconds per question, one question at a time, on the author's laptop (Bedrock and OmniRoute figures include the network); machine and conditions in `docs/measurement-environment.md`.
 - `bedrock-claude` was answered by: us.anthropic.claude-haiku-4-5-20251001-v1:0.
 - `bedrock-claude-opus` was answered by: us.anthropic.claude-opus-4-6-v1.
 - `bedrock-claude-sonnet` was answered by: us.anthropic.claude-sonnet-4-6.
@@ -454,10 +455,12 @@ _Written by hand after reading the stored results. The numbers elsewhere in this
 - **Cost and speed.** At the Price List prices, the 80 cases cost 2.09 (Haiku), 6.08 (Sonnet) and 10.39 USD (Opus), 18.56 in all, and a question costs 0.026, 0.076 and 0.130 USD. Latency p50 is 12, 18 and 26 s, so Opus is about twice as slow and five times as expensive as Haiku for 13 more correct cases in 80 (15 gained and 2 lost; the gain is concentrated in the cases Haiku declined to answer, which a change in the planner might also recover; that was not tested). Tokens per question are almost the same in the three (17.5 to 17.7 thousand in): the price difference is the price list.
 - **Caution.** One run per model, run on the same day but not interleaved, with a draft reference. Haiku asked for clarification on 12 of the non-ambiguous cases, Opus on 8 and Sonnet on 3: how much a model asks is as much a property of the planner prompt as of the model, and nothing here separates them. The Sonnet run overlapped a full local test run during its write cases; every write label read its request from the queue and matches, and no anomaly was found (the gaps in the request ids are the ones the tests consumed).
 
+**Addendum (2026-10-09, after the run).** The author reviewed all 80 expected answers and accepted them unchanged (`review: approved`). The runs were not repeated and no label changed, so every figure above stands. What changes is the status of the reference: finding 1 and the "valid invoice" cases (JOIN-005, -006, -008, -009, -019, -020) now stand against a reference its author has validated, not a draft, so the models' restriction to valid invoices is a divergence from that validated definition and not a possible mistake in a draft. The validation has one reviewer, who also wrote the cases, so it is not an independent benchmark. The findings were written while the set was a draft and are kept as written.
+
 ## How to read this
 
 - **Small samples.** 80 cases split into six categories: a category of 5 cannot be told from chance. The intervals are 95% Wilson and say how little a proportion pins down.
-- **One reviewer.** `review: approved` on all 80 cases since 2026-10-09: the author validated them after the run and changed none. It is the author's reading of the questions, not an independent benchmark, so accuracy is as good as that reading.
+- **One human reviewer.** `review: approved` on all 80 cases since 2026-10-09: a person, the author, reviewed them after the run and changed none. It is the author's reading of the questions, not an independent benchmark, so accuracy is as good as that reading.
 - **Different models.** The profiles run different models on different days; they are shown side by side and not tested against each other. A free-tier model describes that model on that day (ADR-010).
 - **Labels.** Strict by design (columns by position, ADR-011) with three presentation tolerances, frozen in ADR-013. A correct answer in an unusual shape can still be marked wrong.
 - **Circularity.** Rules, traps and metrics share an author; compliance by result is the primary figure and the rule-based one only a cross-check.

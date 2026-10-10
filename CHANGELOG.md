@@ -4,6 +4,15 @@ All notable changes, by phase of `docs/PLAN.md`. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `1.0.0-rc1` was a pre-release until the
 golden set was validated; it became `1.0.0` on 2026-10-09 without a change to the agent.
 
+## [Unreleased]
+
+### Documentation
+
+- `docs/measurement-environment.md`: the machine (MacBook Pro, Apple M5 Max, 36 GB), the local model's
+  build, the AWS deployment and the CI runner behind every timing, and what each timing includes.
+  The README results table, the evaluation report, the cost model and the archive README point to it.
+- The review status of the golden set now reads "reviewed by a person, its author".
+
 ## [1.0.0] - 2026-10-09
 
 ### Changed

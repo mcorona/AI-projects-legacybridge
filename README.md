@@ -38,7 +38,7 @@ run by `scripts/readme_results.py`, and a test fails if they drift from the data
 
 <!-- results:start -->
 
-| Profile | Model | Handled correctly (80) | SWAR rate¹ | Silently wrong² | Defect traps (20) | Cost / question | Latency p50 |
+| Profile | Model | Handled correctly (80) | SWAR rate¹ | Silently wrong² | Defect traps (20) | Cost / question | Latency p50³ |
 |---|---|---|---|---|---|---|---|
 | `local-qwen` | `qwen/qwen3.6-35b-a3b` | 0.49 (39/80) | 0.30 (11/37) | 0.32 (12/37) | 0.45 (9/20) | free (local or free tier) | 29.0 s |
 | `omniroute-free` | `nvidia/nemotron-3-ultra-550b-a55b:free` | 0.65 (52/80) | 0.17 (8/47) | 0.19 (9/47) | 0.75 (15/20) | free (local or free tier) | 50.1 s |
@@ -46,9 +46,9 @@ run by `scripts/readme_results.py`, and a test fails if they drift from the data
 | `bedrock-claude-sonnet` | `us.anthropic.claude-sonnet-4-6` | 0.74 (59/80) | 0.20 (12/59) | 0.24 (14/59) | 0.85 (17/20) | $0.076 | 18.4 s |
 | `bedrock-claude-opus` | `us.anthropic.claude-opus-4-6-v1` | 0.79 (63/80) | 0.14 (8/57) | 0.16 (9/57) | 0.80 (16/20) | $0.130 | 25.6 s |
 
-¹ Delivered answers with confidence ≥ 0.8 that are wrong. ² Delivered answers that are wrong, at any confidence.
+¹ Delivered answers with confidence ≥ 0.8 that are wrong. ² Delivered answers that are wrong, at any confidence. ³ Wall-clock seconds per question, one at a time, on the author's laptop (MacBook Pro, Apple M5 Max, 36 GB); Bedrock and OmniRoute include the network, so the local and cloud figures are not comparable: [`docs/measurement-environment.md`](docs/measurement-environment.md).
 
-One run per model over the 80 golden cases (`review: approved`: validated by the author on 2026-10-09, after the run and without changing any expected answer). Run `20261009`, raw results in `evals/archive/20261009/`.
+One run per model over the 80 golden cases (`review: approved`: reviewed by a person, its author, on 2026-10-09, after the run and without changing any expected answer). Run `20261009`, raw results in `evals/archive/20261009/`.
 
 - **Security:** 45/45 attacks blocked or neutralized; 11/11 of those with a database-level check are refused by the read-only role alone. This does not depend on a model.
 - **Guardrail** (Bedrock, deployed and measured on AWS, then destroyed): 18/18 of the attacks it should stop were blocked; 2/80 of the golden questions were blocked (one of them a legitimate write request: a real false positive); output PII masked on 4/4 probes.
@@ -76,10 +76,10 @@ Ablations (ADR-013), also paired:
 
 <!-- results:end -->
 
-**Read this before quoting a number.** The 80 expected answers have one reviewer, their author, who
-validated them on 2026-10-09 after the run and changed none, so this is not an independent benchmark;
-there is one run per model, so run-to-run noise is not in the intervals; and the models were run at
-different times. The reading of what went wrong, in
+**Read this before quoting a number.** The 80 expected answers were reviewed by one person, their author, on
+2026-10-09, after the run and without changes, so this is not an independent benchmark;
+there is one run per model, so run-to-run noise is not in the intervals; the models were run at
+different times; and every timing comes from one laptop (see the footnote). The reading of what went wrong, in
 [`evals/notes/20261009.md`](evals/notes/20261009.md), matters more than the table.
 
 ## What I learned
@@ -103,8 +103,8 @@ different times. The reading of what went wrong, in
 
 Needs Docker, [`uv`](https://docs.astral.sh/uv/) and Python 3.12 (uv fetches it). No model, key or cloud
 account.
-On a clean clone it takes about two and a half minutes (134 s measured on 2026-10-09, with the Postgres
-image already downloaded; a first run adds that download).
+On a clean clone it takes about two and a half minutes (134 s measured on 2026-10-09 on a MacBook Pro with
+an Apple M5 Max and 36 GB, with the Postgres image already downloaded; 222 s on a GitHub-hosted runner in CI).
 
 ```bash quickstart
 git clone https://github.com/mcorona/AI-projects-legacybridge.git && cd AI-projects-legacybridge
@@ -136,6 +136,7 @@ deployed, measured and destroyed, so nothing is running.
 | [`docs/threat-model.md`](docs/threat-model.md) | STRIDE by trust boundary and OWASP LLM Top 10 (2025), each control with its evidence |
 | [`docs/eval-report.md`](docs/eval-report.md) | The full evaluation: by category, by defect, detector, ablations |
 | [`docs/cost-model.md`](docs/cost-model.md) | Cost per question and per month at 100, 1,000 and 10,000 a day |
+| [`docs/measurement-environment.md`](docs/measurement-environment.md) | The machine, the network and the conditions behind every timing |
 | [`docs/swar-method.md`](docs/swar-method.md) | The idea behind the detector |
 | [`docs/legacy-defects.md`](docs/legacy-defects.md) | The 28 planted defects of the two schemas |
 | [`CHANGELOG.md`](CHANGELOG.md) | What each phase added |
@@ -144,8 +145,8 @@ deployed, measured and destroyed, so nothing is running.
 
 - The data is **synthetic**. Using this on real customer data needs more than is here (see the
   threat model's *Out of scope*).
-- The expected answers of the golden set were validated by their **author**, who also wrote the
-  cases and the reference SQL. That makes them a reviewed reference, not an independent benchmark.
+- The expected answers of the golden set were reviewed by a **person**, their author, who also wrote
+  the cases and the reference SQL. That makes them a reviewed reference, not an independent benchmark.
 - The plan's target for the SWAR rate was not reached (table above).
 - Free-tier models change under you; the results describe the model that answered that day.
 - The 80 questions are 15 simple, 20 joins and aggregates, 20 traps, 10 ambiguous, 5 out of scope and

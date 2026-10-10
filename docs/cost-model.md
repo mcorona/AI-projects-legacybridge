@@ -78,7 +78,7 @@ The worker carries as many questions as its concurrency allows: 2 reserved in th
 
 ## Assumptions
 
-- The mean latency of the run is the time a worker is busy; a client polls every 3 s.
+- The mean latency of the run is the time a worker is busy; a client polls every 3 s. The latencies were measured on the author's laptop, so the Bedrock ones include the network between the laptop and the region; a worker inside the region would not pay that leg, which was not measured over the full set (`docs/measurement-environment.md`).
 - A result is about 20 KB in DynamoDB: 22 write units and 5 read units a poll.
 - The guardrail is called 4 times a question (the question; the answer and its warnings and assumptions), one text unit each, with the content, topic and sensitive-information policies.
 - 4 KB of logs a question; 4 bytes a token through the endpoints.
