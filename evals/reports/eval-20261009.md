@@ -1,8 +1,8 @@
 # Evaluation report 20261009
 
-- Run id **20261009**; generated 2026-10-09 20:02 UTC.
+- Run id **20261009**; generated 2026-10-10 00:18 UTC.
 - Commits the runs were made at: 16ca7a5, 17f3585, 4b3c5ab, c88ba0f, eced896.
-- Cases: **80** golden (`review: draft`, not yet validated by a person) and **45** attacks. One run per arm: run-to-run noise is not measured and the intervals do not include it.
+- Cases: **80** golden (`review: approved`: validated by the author on 2026-10-09, after the run and without changing any expected answer) and **45** attacks. One run per arm: run-to-run noise is not measured and the intervals do not include it.
 - `bedrock-claude` was answered by: us.anthropic.claude-haiku-4-5-20251001-v1:0.
 - `bedrock-claude-opus` was answered by: us.anthropic.claude-opus-4-6-v1.
 - `bedrock-claude-sonnet` was answered by: us.anthropic.claude-sonnet-4-6.
@@ -457,7 +457,7 @@ _Written by hand after reading the stored results. The numbers elsewhere in this
 ## How to read this
 
 - **Small samples.** 80 cases split into six categories: a category of 5 cannot be told from chance. The intervals are 95% Wilson and say how little a proportion pins down.
-- **The golden set is a draft.** `review: draft` on all 80 cases: no person has validated the expected results, so accuracy inherits that uncertainty.
+- **One reviewer.** `review: approved` on all 80 cases since 2026-10-09: the author validated them after the run and changed none. It is the author's reading of the questions, not an independent benchmark, so accuracy is as good as that reading.
 - **Different models.** The profiles run different models on different days; they are shown side by side and not tested against each other. A free-tier model describes that model on that day (ADR-010).
 - **Labels.** Strict by design (columns by position, ADR-011) with three presentation tolerances, frozen in ADR-013. A correct answer in an unusual shape can still be marked wrong.
 - **Circularity.** Rules, traps and metrics share an author; compliance by result is the primary figure and the rule-based one only a cross-check.

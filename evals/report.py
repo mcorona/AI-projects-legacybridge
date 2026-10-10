@@ -22,7 +22,7 @@ from typing import Any
 import yaml
 
 from evals.attacks import AttackOutcome, load_outcomes
-from evals.golden import load_golden
+from evals.golden import APPROVED_ON, all_approved, load_golden
 from evals.metrics import TAU, THRESHOLDS, compare_arms, summarize
 from evals.runner import ARMS, RESULTS, Record, load_records, models_used
 from legacybridge.llm.profiles import CONFIG_PATH
@@ -34,6 +34,13 @@ NOTES = ROOT / "notes"  # hand-written reading of one run: <run-id>.md
 REFERENCE_ARM = "full"
 ABLATION_PROFILE = "local-qwen"
 GOLDEN = {c.id: c for c in load_golden()}
+APPROVED = all_approved(GOLDEN.values())
+REVIEW_STATE = (
+    f"`review: approved`: validated by the author on {APPROVED_ON}, after the run and without "
+    "changing any expected answer"
+    if APPROVED
+    else "`review: draft`, not yet validated by a person"
+)
 
 
 # ============================================================================ loading
@@ -117,7 +124,7 @@ def provenance(run: Run) -> list[str]:
         + (
             " (**the working tree had uncommitted changes in at least one run**)." if dirty else "."
         ),
-        f"- Cases: **{len(GOLDEN)}** golden (`review: draft`, not yet validated by a person) and "
+        f"- Cases: **{len(GOLDEN)}** golden ({REVIEW_STATE}) and "
         f"**{len(run.attacks) if run.attacks else 0}** attacks. One run per arm: run-to-run noise is "
         "not measured and the intervals do not include it.",
     ]
@@ -446,8 +453,14 @@ def appendix(run: Run) -> list[str]:
 READING_NOTES = [
     "- **Small samples.** 80 cases split into six categories: a category of 5 cannot be told from "
     "chance. The intervals are 95% Wilson and say how little a proportion pins down.",
-    "- **The golden set is a draft.** `review: draft` on all 80 cases: no person has validated the "
-    "expected results, so accuracy inherits that uncertainty.",
+    (
+        f"- **One reviewer.** `review: approved` on all 80 cases since {APPROVED_ON}: the author "
+        "validated them after the run and changed none. It is the author's reading of the "
+        "questions, not an independent benchmark, so accuracy is as good as that reading."
+        if APPROVED
+        else "- **The golden set is a draft.** `review: draft` on all 80 cases: no person has "
+        "validated the expected results, so accuracy inherits that uncertainty."
+    ),
     "- **Different models.** The profiles run different models on different days; they are shown side "
     "by side and not tested against each other. A free-tier model describes that model on that day "
     "(ADR-010).",

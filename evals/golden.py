@@ -133,3 +133,12 @@ class GoldenCase(BaseModel):
 def load_golden(path: Path = GOLDEN_PATH) -> list[GoldenCase]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     return [GoldenCase.model_validate(item) for item in raw]
+
+
+APPROVED_ON = "2026-10-09"
+
+
+def all_approved(cases) -> bool:
+    """True when every case has been validated by the owner (``review: approved``)."""
+    cases = list(cases)
+    return bool(cases) and all(c.review == Review.APPROVED for c in cases)

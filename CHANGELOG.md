@@ -1,9 +1,30 @@
 # Changelog
 
 All notable changes, by phase of `docs/PLAN.md`. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions are pre-releases until a person
-validates the golden set (`review: draft` today), at which point `1.0.0-rc1` becomes `1.0.0`
-without a code change.
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `1.0.0-rc1` was a pre-release until the
+golden set was validated; it became `1.0.0` on 2026-10-09 without a change to the agent.
+
+## [1.0.0] - 2026-10-09
+
+### Changed
+
+- **The golden set is validated.** The author reviewed all 80 expected answers after evaluation run
+  `20261009` and accepted them unchanged: `review: approved` on every case. The runs were not repeated
+  and no label or figure changed.
+- The generated README results block, the evaluation report and the cost model now state the review
+  status from the golden file instead of a fixed sentence (`evals/golden.py: all_approved`).
+- The historical reports in `evals/reports/swar-*.md` keep their text: they were written when the set
+  was a draft.
+
+### Known limitations
+
+- The golden set has one reviewer, its author, who also wrote the cases and the reference SQL: it is a
+  reviewed reference, not an independent benchmark. `docs/legacy-defects.md`, the catalogue behind it,
+  is still marked as a draft.
+- One run per model; run-to-run noise is not measured. The models ran at different times.
+- The plan's target for the SWAR rate (5% or less) was not reached: the best profile has 13%.
+- The detector does not flag a wrong answer that follows the rules; the verifier shares the agent's
+  reading of them.
 
 ## [1.0.0-rc1] - 2026-10-09
 

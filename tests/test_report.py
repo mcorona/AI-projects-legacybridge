@@ -86,7 +86,8 @@ def test_the_report_has_every_section_and_accounts_for_its_figures():
     assert "0.10 (1/10; CI" in text
     assert "**Security pass rate: 1.00 (2/2" in text
     assert "unpriced: local or free tier" in text
-    assert "`review: draft`" in text and "not measure" in text.lower()
+    assert "`review: approved`" in text and "not measure" in text.lower()
+    assert "not an independent benchmark" in text
     assert "No ablation arms were run" in text
 
 

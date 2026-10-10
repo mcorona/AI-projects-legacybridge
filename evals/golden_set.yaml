@@ -1,9 +1,9 @@
-# LegacyBridge golden set (DRAFT, pending owner validation).
+# LegacyBridge golden set. Validated by its owner on 2026-10-09: after evaluation run `20261009`, he
+# reviewed all 80 cases and accepted them unchanged (`review: approved`).
 #
 # 80 cases over the invoicing schema: 15 simple, 20 join_agg, 20 defect_trap, 10 ambiguous,
-# 5 out_of_scope, 10 write. Every case is `review: draft` until the owner approves it; only then is
-# it the source of truth (CLAUDE.md). `expected_result_hash: auto` is replaced by
-# `uv run python -m scripts.golden_hash --write` (ADR-011).
+# 5 out_of_scope, 10 write. A case is `review: draft` until the owner approves it; an approved case
+# is the source of truth (CLAUDE.md) and `scripts.golden_hash --write` never rewrites it (ADR-011).
 #
 # Canonical business definitions behind the expected SQL: docs/legacy-defects.md.
 #   - sales / invoices = latest capture per (serie, numfac), status 'V'   (FAC-09, FAC-03)
@@ -18,7 +18,7 @@
   question: "¿Cómo se llama el cliente 0000000007 y en qué estado está?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT nombre, estado FROM clientes WHERE clave = '0000000007'
   expected_result_hash: sha256:9819a822d08c8a9e5a669e34eec03df99dfbfe7f944bd8bfda300eeb7c132d10
@@ -27,7 +27,7 @@
   question: "¿Cuál es el teléfono y el correo del cliente 0000000100?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT telefono, email FROM clientes WHERE clave = '0000000100'
   expected_result_hash: sha256:caac46fbbe2be0ec083846c2551ab90e4ef3638bb114fd4a87b6cb5ada111c20
@@ -36,7 +36,7 @@
   question: "¿Qué descripción y precio de lista tiene el producto P0000007?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT descripcion, precio FROM productos WHERE clave = 'P0000007'
   expected_result_hash: sha256:f142766a83ad8fb746e58d65dac76218a8c9b8ad25f32d0a3b85a3820759e3b7
@@ -45,7 +45,7 @@
   question: "¿Cuántas líneas de producto distintas manejamos?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(DISTINCT linea) FROM productos
   expected_result_hash: sha256:2b74f9c09ee673ccb60a8439e5eaf749ab71127e45b489f16e87f2cb1d5f18bc
@@ -54,7 +54,7 @@
   question: "¿Cuántos clientes tienen status 'I' (inactivo)?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM clientes WHERE status = 'I'
   expected_result_hash: sha256:444a5d49bf4bfdb2c74e3428614da6ac084056dfcb94fd7ea47bc5a5ea01a50a
@@ -63,7 +63,7 @@
   question: "¿Cuántos productos activos (status 'A') hay en la línea SO?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM productos WHERE linea = 'SO' AND status = 'A'
   expected_result_hash: sha256:53195eeaa9d11bd8dc3685406719ce98cdd19d16ff090e062c3676edc94a6431
@@ -72,7 +72,7 @@
   question: "¿En qué estados hay clientes registrados? Lístalos sin repetir."
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT DISTINCT estado FROM clientes ORDER BY estado
   expected_result_hash: sha256:0439ce71bf2eb3a5cf0c722e3bc9ded4b15f76276f02a96b9c0bb2f280df0777
@@ -81,7 +81,7 @@
   question: "¿Cuántos clientes activos (status 'A') hay en Jalisco?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM clientes WHERE estado = 'JAL' AND status = 'A'
   expected_result_hash: sha256:85328ec9e9bcb1f748710fc6131bdabb3d70f651b8380332af4ff2f4d45dd83b
@@ -90,7 +90,7 @@
   question: "¿Cuántos renglones de factura tienen status 'B' en la tabla de detalle?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM facdet WHERE status = 'B'
   expected_result_hash: sha256:05b93f32a4f55423439353abb1cfad724b57f99c433a8e643e73d25a21f627dd
@@ -99,7 +99,7 @@
   question: "¿Cuántos registros de cabecera de factura tienen status 'C' (cancelada)?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM faccab WHERE status = 'C'
   expected_result_hash: sha256:4c8512b0d2f6a212aca34f50f770eebc7a6efb1c6141449e213155e7f9d459ee
@@ -108,7 +108,7 @@
   question: "¿Cuántos productos activos (status 'A') tienen un precio de lista mayor a 500?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM productos WHERE precio > 500 AND status = 'A'
   expected_result_hash: sha256:ef5eb8ac7b18eab38fc43db1ecfed4c49a21810bc393c82b2c5095b8ebe6165c
@@ -117,7 +117,7 @@
   question: "Dame los 5 productos activos (status 'A') con el precio de lista más alto: clave, descripción y precio."
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT clave, descripcion, precio FROM productos
     WHERE status = 'A' ORDER BY precio DESC, clave LIMIT 5
@@ -127,7 +127,7 @@
   question: "¿Cuántos clientes activos (status 'A') hay por estado?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT estado, COUNT(*) FROM clientes
     WHERE status = 'A' GROUP BY estado ORDER BY estado
@@ -137,7 +137,7 @@
   question: "¿Cuántos productos activos (status 'A') hay por línea?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT linea, COUNT(*) FROM productos
     WHERE status = 'A' GROUP BY linea ORDER BY linea
@@ -147,7 +147,7 @@
   question: "¿Cuál es el precio de lista mínimo y máximo entre los productos activos (status 'A')?"
   category: simple
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT MIN(precio), MAX(precio) FROM productos WHERE status = 'A'
   expected_result_hash: sha256:4d992b80b62aa07a7267fba5c7b49c201d2625e84f59152c6bf88ee4636186be
@@ -156,7 +156,7 @@
   question: "¿Cuántas unidades se han vendido por línea de producto? Considera solo renglones activos (status 'A')."
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT p.linea, SUM(d.cantidad) AS unidades
     FROM facdet d JOIN productos p ON p.clave = d.producto
@@ -167,7 +167,7 @@
   question: "¿Cuáles son los 10 productos activos con más unidades en renglones activos? Dame clave, descripción y unidades."
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT p.clave, p.descripcion, SUM(d.cantidad) AS unidades
     FROM facdet d JOIN productos p ON p.clave = d.producto
@@ -179,7 +179,7 @@
   question: "De los productos de la línea FE, ¿cuáles 5 aparecen en más renglones activos (status 'A')?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT p.clave, COUNT(*) AS renglones
     FROM facdet d JOIN productos p ON p.clave = d.producto
@@ -191,7 +191,7 @@
   question: "¿Cuáles son los 5 estados con más clientes activos (status 'A') que tienen al menos un registro de factura?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT c.estado, COUNT(DISTINCT c.clave) AS clientes
     FROM clientes c JOIN faccab f ON f.cliente = c.clave
@@ -202,7 +202,7 @@
   question: "¿Cuántos clientes activos (status 'A') tienen al menos un registro en la tabla de cabeceras de factura?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(DISTINCT c.clave)
     FROM clientes c JOIN faccab f ON f.cliente = c.clave
@@ -213,7 +213,7 @@
   question: "¿Qué 10 clientes activos (status 'A') tienen más folios distintos de factura? Muestra clave, nombre y folios."
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT c.clave, c.nombre, COUNT(DISTINCT f.serie || f.numfac) AS folios
     FROM clientes c JOIN faccab f ON f.cliente = c.clave
@@ -225,7 +225,7 @@
   question: "¿Cuál es el precio de lista promedio de los productos activos por línea?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT linea, ROUND(AVG(precio), 2) FROM productos
     WHERE status = 'A' GROUP BY linea ORDER BY linea
@@ -235,7 +235,7 @@
   question: "¿Cuántos productos activos (status 'A') aparecen en menos de 90 renglones activos de factura?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM (
       SELECT p.clave FROM productos p
@@ -247,7 +247,7 @@
   question: "¿Cuántos clientes activos (status 'A') no tienen ningún registro en la tabla de cabeceras de factura?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM clientes c
     WHERE c.status = 'A' AND NOT EXISTS (SELECT 1 FROM faccab f WHERE f.cliente = c.clave)
@@ -257,7 +257,7 @@
   question: "¿Cuántos folios distintos hay en cada serie de factura?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT serie, COUNT(DISTINCT numfac) FROM faccab GROUP BY serie ORDER BY serie
   expected_result_hash: sha256:f19aceee271f4352a423b5fad80e352e1f1e198218f5498a1e123de91dfccbb2
@@ -266,7 +266,7 @@
   question: "¿Cuántas unidades y cuántos renglones activos (status 'A') tiene el producto P0000010?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT SUM(cantidad), COUNT(*) FROM facdet
     WHERE producto = 'P0000010' AND status = 'A'
@@ -276,7 +276,7 @@
   question: "¿Qué producto aparece en más renglones activos (status 'A')? Dame clave, descripción y cuántos renglones."
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT p.clave, p.descripcion, COUNT(*) AS renglones
     FROM facdet d JOIN productos p ON p.clave = d.producto
@@ -288,7 +288,7 @@
   question: "Por línea de producto, ¿cuántos productos activos hay y cuál es el precio de lista más alto?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT linea, COUNT(*), MAX(precio) FROM productos
     WHERE status = 'A' GROUP BY linea ORDER BY linea
@@ -298,7 +298,7 @@
   question: "¿Qué estados tienen más de 10 clientes activos (status 'A')?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT estado, COUNT(*) FROM clientes WHERE status = 'A'
     GROUP BY estado HAVING COUNT(*) > 10 ORDER BY estado
@@ -308,7 +308,7 @@
   question: "¿Qué línea de producto acumula más unidades en renglones activos (status 'A')?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT p.linea, SUM(d.cantidad) AS unidades
     FROM facdet d JOIN productos p ON p.clave = d.producto
@@ -319,7 +319,7 @@
   question: "Lista los primeros 10 clientes activos (status 'A') del DF por orden alfabético: clave y nombre."
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT clave, nombre FROM clientes
     WHERE estado = 'DF' AND status = 'A' ORDER BY nombre, clave LIMIT 10
@@ -329,7 +329,7 @@
   question: "¿Qué productos activos de la línea EL tienen un precio de lista por encima del promedio de los productos activos de esa línea?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT clave, descripcion, precio FROM productos p
     WHERE p.linea = 'EL' AND p.status = 'A'
@@ -341,7 +341,7 @@
   question: "¿Cuántos renglones activos (status 'A') corresponden a productos que hoy tienen status 'B'?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM facdet d JOIN productos p ON p.clave = d.producto
     WHERE d.status = 'A' AND p.status = 'B'
@@ -351,7 +351,7 @@
   question: "¿Cuántos clientes activos (status 'A') tienen más de 30 folios distintos de factura?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT COUNT(*) FROM (
       SELECT c.clave FROM clientes c JOIN faccab f ON f.cliente = c.clave
@@ -363,7 +363,7 @@
   question: "Para los clientes activos (status 'A') de Jalisco, ¿cuántos folios distintos hay en cada serie?"
   category: join_agg
   expected_behavior: answer
-  review: draft
+  review: approved
   expected_sql: |
     SELECT f.serie, COUNT(DISTINCT f.numfac)
     FROM faccab f JOIN clientes c ON c.clave = f.cliente
@@ -374,7 +374,7 @@
   question: "¿Cuánto facturamos en pesos (MXN) a clientes de Jalisco en 2003?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03, FAC-04, FAC-05, FAC-08, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -398,7 +398,7 @@
   question: "¿Cuántas facturas activas hubo en 2004?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03, FAC-05, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -419,7 +419,7 @@
   question: "¿Cuántos clientes tenemos registrados?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03]
   expected_sql: |
     SELECT COUNT(*) FROM clientes WHERE status <> 'B'
@@ -431,7 +431,7 @@
   question: "¿Cuál fue el total facturado, con IVA, en 2005?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03, FAC-04, FAC-05, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -452,7 +452,7 @@
   question: "¿Cuántas facturas vigentes se emitieron en marzo de 2004?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03, FAC-05, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -475,7 +475,7 @@
   question: "¿Cuántos renglones activos tienen las facturas vigentes de enero de 2005?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-01, FAC-03, FAC-05, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -501,7 +501,7 @@
   question: "¿Cuántas unidades del producto P0000020 se han vendido en facturas vigentes?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-01, FAC-03, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -527,7 +527,7 @@
   question: "¿Cuántas facturas vigentes hubo en total entre 2001 y 2003, incluyendo las de clientes que ya no están en el catálogo?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-02, FAC-03, FAC-05, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -548,7 +548,7 @@
   question: "¿Cuántas unidades suman todos los renglones activos de la tabla de detalle, incluso los de productos que no están en el catálogo?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-02, FAC-03]
   expected_sql: |
     SELECT SUM(cantidad) FROM facdet WHERE status = 'A'
@@ -561,7 +561,7 @@
   question: "¿Qué productos tenemos en catálogo en la línea PL? Dame clave y descripción."
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03]
   expected_sql: |
     SELECT clave, descripcion FROM productos
@@ -574,7 +574,7 @@
   question: "¿Cuántas facturas vigentes se emitieron con el RFC SHD680112JR7?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03, FAC-06, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -594,7 +594,7 @@
   question: "¿Qué agente ha emitido más facturas vigentes? Dame el código y cuántas."
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03, FAC-07, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -616,7 +616,7 @@
   question: "¿Cuánto facturamos en dólares en 2002?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03, FAC-04, FAC-05, FAC-07, FAC-08, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -637,7 +637,7 @@
   question: "¿Cuál fue la facturación total de 2002 por moneda?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03, FAC-04, FAC-05, FAC-07, FAC-08, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -659,7 +659,7 @@
   question: "¿Cuál es el total de la factura serie B, folio 698?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-04, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -678,7 +678,7 @@
   question: "Lista los clientes de Querétaro con su nombre y teléfono."
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03]
   expected_sql: |
     SELECT nombre, telefono FROM clientes
@@ -691,7 +691,7 @@
   question: "¿Cuántos renglones activos tiene la factura serie A, folio 1003?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-01, FAC-03]
   expected_sql: |
     WITH d AS (
@@ -709,7 +709,7 @@
   question: "¿Cuántas facturas vigentes se emitieron antes de 2001?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-03, FAC-05, FAC-09]
   expected_sql: |
     WITH f AS (
@@ -729,7 +729,7 @@
   question: "¿Qué dice la descripción del producto P0000092?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-10]
   expected_sql: |
     SELECT descripcion FROM productos WHERE clave = 'P0000092'
@@ -742,7 +742,7 @@
   question: "¿Qué observaciones tiene el renglón 2 de la factura serie B, folio 115?"
   category: defect_trap
   expected_behavior: answer
-  review: draft
+  review: approved
   defects: [FAC-01, FAC-10]
   expected_sql: |
     SELECT obs FROM facdet
@@ -756,112 +756,112 @@
   question: "¿Cuánto vendimos?"
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "No period, no currency, and 'vendimos' may or may not include IVA."
 
 - id: AMB-002
   question: "¿Cuál es nuestro mejor cliente?"
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "'Mejor' by amount, number of invoices or recency?"
 
 - id: AMB-003
   question: "¿Cuál es el producto más vendido?"
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "By units or by amount, and over which period?"
 
 - id: AMB-004
   question: "Dame las ventas del año pasado."
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "'Last year' has no anchor: the data spans 2000-2005."
 
 - id: AMB-005
   question: "¿Cuánto facturamos en total, sumando dólares y pesos?"
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "There is no exchange rate in the database; it must ask which one to use."
 
 - id: AMB-006
   question: "Muéstrame los clientes grandes."
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "'Grandes' by billing volume, by number of invoices, by size?"
 
 - id: AMB-007
   question: "¿Cómo va la facturación?"
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "No metric, no period, no comparison base."
 
 - id: AMB-008
   question: "¿Cuántas facturas tiene Ruiz?"
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "Several customers have 'Ruiz' in their name (e.g. 0000000003, 0000000028, 0000000037)."
 
 - id: AMB-009
   question: "¿Qué estado vende más?"
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "By amount or by invoice count, in which currency and period?"
 
 - id: AMB-010
   question: "¿Qué productos se venden mal?"
   category: ambiguous
   expected_behavior: clarify
-  review: draft
+  review: approved
   notes: "No threshold, period or measure."
 
 - id: OOS-001
   question: "¿Cuál será la facturación de 2007?"
   category: out_of_scope
   expected_behavior: abstain
-  review: draft
+  review: approved
   notes: "A forecast; the database holds history only."
 
 - id: OOS-002
   question: "¿Cuál era el tipo de cambio del dólar en 2002?"
   category: out_of_scope
   expected_behavior: abstain
-  review: draft
+  review: approved
   notes: "Exchange rates are not stored anywhere."
 
 - id: OOS-003
   question: "Dame las contraseñas de los usuarios del sistema."
   category: out_of_scope
   expected_behavior: abstain
-  review: draft
+  review: approved
   notes: "Not in the schema and sensitive; must be refused."
 
 - id: OOS-004
   question: "¿Quién ganó el mundial de fútbol de 2002?"
   category: out_of_scope
   expected_behavior: abstain
-  review: draft
+  review: approved
   notes: "Unrelated to the data."
 
 - id: OOS-005
   question: "¿Cuánto nos cuesta fabricar cada producto?"
   category: out_of_scope
   expected_behavior: abstain
-  review: draft
+  review: approved
   notes: "There is no cost data, only list prices."
 
 - id: WRITE-001
   question: "Da de baja al cliente 0000000150."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: clientes
     update: {status: "B"}
@@ -872,7 +872,7 @@
   question: "Cambia el teléfono del cliente 0000000007 a 3312345678."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: clientes
     update: {telefono: "3312345678"}
@@ -883,7 +883,7 @@
   question: "Actualiza el correo del cliente 0000000150 a compras@example.com."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: clientes
     update: {email: "compras@example.com"}
@@ -894,7 +894,7 @@
   question: "Da de baja el producto P0000100."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: productos
     update: {status: "B"}
@@ -905,7 +905,7 @@
   question: "Reactiva al cliente 0000000017."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: clientes
     update: {status: "A"}
@@ -916,7 +916,7 @@
   question: "Marca como inactivo al cliente 0000000100."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: clientes
     update: {status: "I"}
@@ -927,7 +927,7 @@
   question: "Reactiva el producto P0000001."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: productos
     update: {status: "A"}
@@ -938,7 +938,7 @@
   question: "Da de baja a todos los clientes inactivos de Guanajuato."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: clientes
     update: {status: "B"}
@@ -949,7 +949,7 @@
   question: "Cambia el teléfono del cliente Distribuidora Monarca a 3399887766."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: clientes
     update: {telefono: "3399887766"}
@@ -960,7 +960,7 @@
   question: "Da de baja el producto 'Lamina negra cal 1/2'."
   category: write
   expected_behavior: propose_write
-  review: draft
+  review: approved
   expected_change:
     table: productos
     update: {status: "B"}

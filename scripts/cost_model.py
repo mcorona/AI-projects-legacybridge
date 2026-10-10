@@ -338,8 +338,8 @@ def render(archive: Path = ARCHIVE, prices_path: Path = PRICES) -> str:
         "Data transfer out, KMS, a support plan, taxes, Transaction Search ingestion (nothing "
         "without traffic; spans bill as logs with it), the AWS free tier, Bedrock quotas and "
         "throttling, and any saving from prompt caching or batch inference, neither of which was "
-        "measured. The golden set is a draft, so the *answers* these costs buy are provisional "
-        "even if the costs are not.",
+        "measured. Each profile ran once, so the *answers* these costs buy carry no measure of "
+        "run-to-run noise even if the costs are exact.",
         "",
     ]
     return "\n".join(L)

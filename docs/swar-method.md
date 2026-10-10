@@ -97,7 +97,7 @@ Limits, stated plainly:
 - **Corrected after the fact.** Five definition errors (four in the detector and its rules, one in the
   labels) were fixed after seeing results. None changed a weight or a threshold. The relabelled cases
   all moved toward "correct"; the reports keep the as-run figures next to the corrected ones.
-- **Draft labels.** The golden set is still `review: draft`.
+- **One reviewer.** The golden set was approved by its author on 2026-10-09, after the measurements and without changes; the labels are his reading, not an independent one.
 - **Priors, not fits.** Weights and thresholds were written down before measuring.
 - **Models change.** A free-tier result describes that model on that day (ADR-010).
 

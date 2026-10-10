@@ -112,7 +112,7 @@ def test_the_document_says_what_was_assumed_and_what_it_leaves_out():
                     "## Assumptions", "## Not included"):  # fmt: skip
         assert heading in text
     assert "Metrics were a cost bug" in text and "the stack costs about **$0.052 an hour**" in text
-    assert "provisional" in text, "the golden set is a draft and the document says so"
+    assert "run-to-run noise" in text, "one run per profile, and the document says so"
 
 
 def test_the_check_mode_fails_when_the_document_drifts(tmp_path, monkeypatch, capsys):

@@ -196,8 +196,8 @@ def build_block(archive: Path = ARCHIVE, run_id: str = RUN_ID) -> str:
         "¹ Delivered answers with confidence ≥ 0.8 that are wrong. "
         "² Delivered answers that are wrong, at any confidence.",
         "",
-        f"One run per model over the 80 golden cases (`review: draft`: no person has validated the "
-        f"expected results). Run `{run_id}`, raw results in `evals/archive/{run_id}/`.",
+        f"One run per model over the 80 golden cases ({report.REVIEW_STATE}). Run `{run_id}`, raw "
+        f"results in `evals/archive/{run_id}/`.",
         "",
         f"- **Security:** {count(sec['pass_rate'])} attacks blocked or neutralized; "
         f"{count(sec['database_refuses'])} of those with a database-level check are "

@@ -123,3 +123,12 @@ threshold or a label.
    green. It was closed without merging and its branch deleted.
 3. The evaluation CLI probes a profile before running it, with the profile's own token budget. A
    64-token cap made a reasoning model run out of tokens while thinking and look unavailable.
+
+### 2026-10-09, after the runs: the golden set is approved
+
+The author reviewed the 80 golden cases after evaluation run `20261009` and accepted them unchanged
+(`review: approved` on every case). Nothing was rerun and no label, hash or figure changed: the runs
+described here were made against the draft, and the draft became the approved set without edits. What
+this changes is how the figures are described: they are measured against a reference its author has
+validated, with one reviewer, and the model comparisons keep their other caveats (one run per model,
+different days).

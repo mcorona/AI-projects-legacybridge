@@ -319,3 +319,11 @@ What remains, on purpose or because it cannot be removed:
   while, and these were 33 series from about two hours of use, so the cost is a few dollars at most
   and shrinks to zero by itself.
 
+### 2026-10-09, after the runs: the golden set is approved
+
+The author reviewed the 80 golden cases after evaluation run `20261009` and accepted them unchanged
+(`review: approved` on every case). Nothing was rerun and no label, hash or figure changed: the runs
+described here were made against the draft, and the draft became the approved set without edits. What
+this changes is how the figures are described: they are measured against a reference its author has
+validated, with one reviewer, and the model comparisons keep their other caveats (one run per model,
+different days).

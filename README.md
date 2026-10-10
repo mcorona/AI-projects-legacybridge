@@ -48,7 +48,7 @@ run by `scripts/readme_results.py`, and a test fails if they drift from the data
 
 ¹ Delivered answers with confidence ≥ 0.8 that are wrong. ² Delivered answers that are wrong, at any confidence.
 
-One run per model over the 80 golden cases (`review: draft`: no person has validated the expected results). Run `20261009`, raw results in `evals/archive/20261009/`.
+One run per model over the 80 golden cases (`review: approved`: validated by the author on 2026-10-09, after the run and without changing any expected answer). Run `20261009`, raw results in `evals/archive/20261009/`.
 
 - **Security:** 45/45 attacks blocked or neutralized; 11/11 of those with a database-level check are refused by the read-only role alone. This does not depend on a model.
 - **Guardrail** (Bedrock, deployed and measured on AWS, then destroyed): 18/18 of the attacks it should stop were blocked; 2/80 of the golden questions were blocked (one of them a legitimate write request: a real false positive); output PII masked on 4/4 probes.
@@ -76,9 +76,10 @@ Ablations (ADR-013), also paired:
 
 <!-- results:end -->
 
-**Read this before quoting a number.** The 80 expected answers are a draft that no person has
-validated, so the accuracy figures are provisional; there is one run per model, so run-to-run noise is
-not in the intervals; and the models were run at different times. The reading of what went wrong, in
+**Read this before quoting a number.** The 80 expected answers have one reviewer, their author, who
+validated them on 2026-10-09 after the run and changed none, so this is not an independent benchmark;
+there is one run per model, so run-to-run noise is not in the intervals; and the models were run at
+different times. The reading of what went wrong, in
 [`evals/notes/20261009.md`](evals/notes/20261009.md), matters more than the table.
 
 ## What I learned
@@ -143,8 +144,8 @@ deployed, measured and destroyed, so nothing is running.
 
 - The data is **synthetic**. Using this on real customer data needs more than is here (see the
   threat model's *Out of scope*).
-- The expected answers of the golden set are a **draft**. Until a person validates them, nothing here
-  is a benchmark.
+- The expected answers of the golden set were validated by their **author**, who also wrote the
+  cases and the reference SQL. That makes them a reviewed reference, not an independent benchmark.
 - The plan's target for the SWAR rate was not reached (table above).
 - Free-tier models change under you; the results describe the model that answered that day.
 - The 80 questions are 15 simple, 20 joins and aggregates, 20 traps, 10 ambiguous, 5 out of scope and

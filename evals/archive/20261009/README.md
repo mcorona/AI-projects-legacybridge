@@ -25,6 +25,7 @@ The profiles and what answered them:
 | `bedrock-claude-sonnet` | `us.anthropic.claude-sonnet-4-6` | full |
 | `bedrock-claude-opus` | `us.anthropic.claude-opus-4-6-v1` | full |
 
-What these files cannot tell you: run-to-run noise (one run per arm), and whether the draft golden
-set is right (`review: draft`: no person has validated its expected results). The reading of the
-failures is in `evals/notes/20261009.md`.
+What these files cannot tell you: run-to-run noise (one run per arm), and whether the golden
+set is right: its author validated it on 2026-10-09, after the run and without changes
+(`review: approved`), so it is a reviewed reference with one reviewer. The reading of the failures is
+in `evals/notes/20261009.md`.

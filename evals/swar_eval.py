@@ -19,7 +19,7 @@ from pathlib import Path
 
 import yaml
 
-from evals.golden import Behavior, GoldenCase, load_golden
+from evals.golden import APPROVED_ON, Behavior, GoldenCase, all_approved, load_golden
 from evals.labels import label_run
 from evals.metrics import (  # noqa: F401 - re-exported
     Confusion,
@@ -280,7 +280,12 @@ def build_report(
         "- **Small sample.** The intervals say how little a handful of cases can tell. Do not quote a point value.",
         "- **Circularity.** Defect rules, traps, metrics and the catalogue come from one author; "
         "recall on rule signals holds by construction. The verifier's briefing includes the rule warnings.",
-        "- **The golden set is `review: draft`.** A label is only as good as the case behind it.",
+        (
+            f"- **The golden set has one reviewer, its author** (`review: approved` since "
+            f"{APPROVED_ON}). A label is only as good as the case behind it."
+            if all_approved(load_golden())
+            else "- **The golden set is `review: draft`.** A label is only as good as the case behind it."
+        ),
         "- **Strict labels.** Columns are compared by position (ADR-011); extra columns are tolerated. "
         "A correct answer phrased as a different query shape can be mislabelled wrong.",
         "- **Free-tier models change from day to day** (ADR-010): a result for `omniroute-free` describes "
