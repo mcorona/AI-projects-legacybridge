@@ -11,7 +11,9 @@ golden set was validated; it became `1.0.0` on 2026-10-09 without a change to th
 - `docs/measurement-environment.md`: the machine (MacBook Pro, Apple M5 Max, 36 GB), the local model's
   build, the AWS deployment and the CI runner behind every timing, and what each timing includes.
   The README results table, the evaluation report, the cost model and the archive README point to it.
-- The review status of the golden set now reads "reviewed by a person, its author".
+- The review status of the golden set now reads "reviewed by a person, its author", everywhere it is
+  stated (including the dated reports of Phase 5 and the ADRs, which note when it was a draft).
+- The package and API version is 1.0.0, matching the release (it was still 0.1.0).
 
 ## [1.0.0] - 2026-10-09
 
@@ -99,7 +101,7 @@ golden set was validated; it became `1.0.0` on 2026-10-09 without a change to th
 
 ### Known limitations
 
-- The expected answers of the golden set are a **draft**: no person has validated them.
+- The expected answers of the golden set were a **draft** at this pre-release (resolved in 1.0.0: reviewed by a person, their author).
 - One run per model; run-to-run noise is not measured.
 - The plan's target for the SWAR rate (5% or less) was not reached: the best profile has 13%.
 - The detector does not flag a wrong answer that follows the rules; the verifier shares the agent's

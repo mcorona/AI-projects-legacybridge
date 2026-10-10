@@ -105,6 +105,6 @@ Mean per run: 52.9 s, 7.8 model calls, 20662 input and 4342 output tokens.
 
 - **Small sample.** The intervals say how little a handful of cases can tell. Do not quote a point value.
 - **Circularity.** Defect rules, traps, metrics and the catalogue come from one author; recall on rule signals holds by construction. The verifier's briefing includes the rule warnings.
-- **The golden set is `review: draft`.** A label is only as good as the case behind it.
+- **The golden set had one reviewer, its author** (`review: approved` since 2026-10-09; it was `review: draft` when this measurement was made). A label is only as good as the case behind it.
 - **Strict labels.** Columns are compared by position (ADR-011); extra columns are tolerated. A correct answer phrased as a different query shape can be mislabelled wrong.
 - **Free-tier models change from day to day** (ADR-010): a result for `omniroute-free` describes that model on that day.

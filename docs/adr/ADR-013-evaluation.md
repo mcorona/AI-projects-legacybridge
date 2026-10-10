@@ -15,7 +15,7 @@ results is reported twice, "as it ran" and "corrected" (`--relabel` / `--rescore
 
 ## What is evaluated
 
-The 80 golden cases (`evals/golden_set.yaml`, still `review: draft`) and the 45 attacks
+The 80 golden cases (`evals/golden_set.yaml`, `review: draft` when this was written; approved unchanged on 2026-10-09, see the last entry) and the 45 attacks
 (`evals/attacks.yaml`), in three **arms**:
 
 | Arm | What changes |

@@ -82,7 +82,7 @@ def create_front_app(
 ) -> FastAPI:
     if require_auth and not token:
         raise RuntimeError("the API requires a bearer token and none is configured (fail closed)")
-    app = FastAPI(title="LegacyBridge", version="0.1.0")
+    app = FastAPI(title="LegacyBridge", version="1.0.0")
 
     def authorize(request: Request) -> None:
         if not token:

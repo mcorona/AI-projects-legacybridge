@@ -1,6 +1,6 @@
 [project]
 name = "legacybridge"
-version = "0.1.0"
+version = "1.0.0"
 description = "Reliable AI agents over legacy enterprise databases: secure, observable and measured."
 readme = "README.md"
 authors = [

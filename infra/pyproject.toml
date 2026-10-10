@@ -1,6 +1,6 @@
 [project]
 name = "legacybridge-infra"
-version = "0.1.0"
+version = "1.0.0"
 description = "CDK stack for the AWS deployment of LegacyBridge (ADR-014). Separate from the runtime so it adds nothing to the image."
 requires-python = ">=3.12"
 dependencies = [

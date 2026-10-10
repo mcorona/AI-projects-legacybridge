@@ -80,7 +80,7 @@ def create_app(
             finally:
                 shutdown_tracing()
 
-    app = FastAPI(title="LegacyBridge", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="LegacyBridge", version="1.0.0", lifespan=lifespan)
 
     def authorize(request: Request) -> None:
         if not secret:

@@ -59,7 +59,7 @@ are reported at several thresholds, not at the best one.
   the rule warnings, so its agreement correlates with them. The report therefore separates static
   from dynamic signals and lists rule-blind errors (wrong result, no violation) on their own.
 - **A fixed 20-case subset**, committed before measuring, free of tie-prone `ORDER BY ... LIMIT`
-  cases. The golden set is still `review: draft`, so labels inherit that uncertainty.
+  cases. The golden set was still `review: draft` then (its author approved it unchanged on 2026-10-09), so labels inherit that uncertainty.
 - **Early warning is checked by replay:** the stored events of each run give the risk computed from
   the first *k* spans.
 

@@ -6,7 +6,7 @@
 #   - TRAP-002 is left out: tests/test_live.py already uses its question;
 #   - every invoicing defect FAC-01 .. FAC-10 appears in at least one case;
 #   - every category appears: answers, ambiguous, out of scope and writes.
-# The golden set is still `review: draft`, so the labels inherit that uncertainty.
+# The golden set was `review: draft` when this subset was fixed; its author approved it unchanged on 2026-10-09.
 version: 1
 cases:
   # simple
