@@ -102,8 +102,8 @@ Ablations (ADR-013), also paired:
 
 <!-- results:end -->
 
-**Read this before quoting a number.** The 80 expected answers were reviewed by one person, their
-author, after the run and without changes, so this is not an independent benchmark. There is one run
+**Read this before quoting a number.** The 80 expected answers were reviewed only by their author,
+after the run and without changes, so this is not an independent benchmark. There is one run
 per model, so run-to-run noise is not captured; the models ran at different times; and every timing
 comes from one laptop. The analysis in [`evals/notes/20261009.md`](evals/notes/20261009.md) matters more than the table.
 
@@ -112,19 +112,19 @@ comes from one laptop. The analysis in [`evals/notes/20261009.md`](evals/notes/2
   to "valid invoices" where the question asked for any record; the verifier agreed with them, and the
   detector did not flag them: its signals fire when a rule is *violated*, and here it was *followed*.
 - **A larger model answers more often; it does not clearly err less.** Opus beats Haiku on the paired
-  test (15 cases against 2), but most of the gain is questions Haiku declined to answer.
+  test (15 cases against 2), but most of the gain comes from questions Haiku declined to answer.
 - **Each layer can look better than it is.** The guardrail blocked 18 of 18 attacks but also a
   legitimate write; the retrieval probe scored 20 of 20, as would a retriever that ignored the query.
 - **Measuring the system found bugs in it.** The cost model exposed metrics that cost nearly
   four times what the dashboard needed; the first deployment exposed a missing permission.
-- **Tests were written down before the runs.** Levels, labels, and metrics were fixed in ADRs first,
-  which is why "Sonnet against Haiku, p = 0.049" is reported as *not* distinguishable.
+- **The analysis was preregistered.** Significance levels, labels, and metrics were fixed in ADRs
+  before the runs, which is why "Sonnet against Haiku, p = 0.049" is reported as *not* distinguishable.
 
 ## Run it in 5 commands
 
 Requires Docker, [`uv`](https://docs.astral.sh/uv/), and Python 3.12 (uv fetches it); no model, key,
 or cloud account. A clean clone takes about two and a half minutes (134 s on 2026-10-09 on a MacBook
-Pro with an Apple M5 Max and 36 GB, Postgres image cached; 222 s on a GitHub-hosted CI runner).
+Pro with an Apple M5 Max and 36 GB, with the Postgres image cached; 222 s on a GitHub-hosted runner).
 
 ```bash quickstart
 git clone https://github.com/mcorona/AI-projects-legacybridge.git && cd AI-projects-legacybridge
@@ -134,17 +134,17 @@ make demo       # the three acts above: a trap, attacks, a write that waits for 
 make test       # the whole suite, including the 45 attacks against the real database
 ```
 
-To ask a real question, pick a profile from [`config/models.yaml`](config/models.yaml), copy its
-variables from `.env.example` (credentials never belong in a file), and run
-`uv run legacybridge ask "<question>" --profile local-qwen`; proposed writes wait in
-`uv run legacybridge approvals list`. The AWS deployment (`make deploy`, [`docs/architecture/deployment-aws.md`](docs/architecture/deployment-aws.md))
+To ask a real question, pick a profile in [`config/models.yaml`](config/models.yaml), copy its variables
+from `.env.example` (credentials never belong in a file), and run `uv run legacybridge ask "<question>"
+--profile local-qwen`; proposed writes wait in `uv run legacybridge approvals list` for a person. The AWS
+deployment (`make deploy`, see [`docs/architecture/deployment-aws.md`](docs/architecture/deployment-aws.md))
 was deployed, measured, and destroyed, so nothing is running.
 
 ## Limitations
 
-- **Synthetic data only.** Real customer data would need more than is here (the threat model's *Out of scope*).
-- **Not an independent benchmark.** One person, their author, wrote the cases and reference SQL and
-  reviewed the expected answers.
+- **Synthetic data only.** Production use on real data needs controls beyond this repository (threat model, *Out of scope*).
+- **Not an independent benchmark.** The cases, the reference SQL, and the expected answers were all
+  written and reviewed by one person, the author.
 - **Silent errors are reduced, not solved.** The plan's SWAR-rate target was not met (table above),
   and the detector misses errors that follow a rule but misread the question.
 - **Small samples, moving targets, one tenant.** One run per model; free tiers change without notice;
