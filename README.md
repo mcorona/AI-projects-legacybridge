@@ -1,21 +1,20 @@
 # LegacyBridge
 
-> Reliable AI agents over legacy enterprise databases: secure, observable and measured.
+> Trustworthy AI agents over legacy enterprise databases: secure, observable, and measured.
 
-Companies want to talk to their data, but the data lives in schemas with text dates, logically
-deleted rows, no foreign keys and columns reused for new meanings. A text-to-SQL demo works on a
-clean database and fails **silently** on one of these: the query runs, the number looks plausible, and
-it is wrong. LegacyBridge is an agent built to be trusted on that kind of database. It shows the SQL
-and the rows behind every answer, checks the answer with an independent verifier, scores how likely
-the run is to be silently wrong, needs a person to approve every write, and is measured against a
-frozen set of 80 questions and 45 attacks.
+## Overview
+
+Companies want to query their data in plain language, but that data often lives in legacy schemas
+with dates stored as text, logically deleted rows, no foreign keys, and repurposed columns. A
+text-to-SQL demo that works on a clean database fails **silently** on these: the query runs, the
+figure looks plausible, and it is wrong. LegacyBridge is an agent built to be trusted on exactly this
+kind of database. Every answer ships with the SQL and rows behind it, is re-derived by an independent
+verifier, and is scored for how likely the run is to be *silently wrong at runtime* (SWAR). Every
+write needs human approval, and the whole system is measured against a frozen set of
+80 questions and 45 attacks over two schemas with 28 planted defects. The agent is model-agnostic
+(a local model, OmniRoute free tiers, or Claude on Amazon Bedrock) and deploys with AWS CDK.
 
 <p align="center"><img src="docs/demo/demo.gif" alt="A trap question answered by a naive and a reference query, attacks blocked, and a write that waits for a person" width="880"></p>
-
-*The demo above needs no model: it drives the real tools, rule engine, detector and approval flow with
-an oracle in place of the model. `make demo` runs it.*
-
-## How a question moves
 
 ```mermaid
 flowchart LR
@@ -27,14 +26,41 @@ flowchart LR
     W --> T["MCP tools"] --> D[("PostgreSQL<br/>read-only role")]
 ```
 
-The model is not trusted and neither is the data. Everything it asks for goes through an MCP server
-that parses each query to an AST, runs it with a role that can only `SELECT`, and warns when a query
-reads a known defect wrongly. Details: [`docs/architecture/`](docs/architecture/README.md).
+## Safety: no unauthorized or irreversible AI actions
 
-## Results
+The design assumes that **neither the model nor the data can be trusted** and that any layer can fail.
 
-Five models on the same 80 questions, one run each. These tables are **generated** from the stored
-run by `scripts/readme_results.py`, and a test fails if they drift from the data.
+- **Reads are constrained twice.** An MCP server parses every query into an AST and accepts only a
+  single `SELECT` over allowlisted tables, columns, and functions, with capped rows and no system
+  catalogs ([ADR-004](docs/adr/ADR-004-sql-security.md)). It then runs as `lb_reader`, which can only
+  `SELECT` in a read-only transaction with a 5 s statement timeout: a parser bypass still cannot write.
+- **The agent cannot write; it can only propose.** `propose_write` executes nothing: it checks the
+  change against an allowlist of tables, columns, and values, requires an equality `WHERE`, refuses
+  more than 100 rows, and queues a preview through an insert-only role ([ADR-005](docs/adr/ADR-005-writes-and-hitl.md)).
+- **A person approves, outside the model's reach.** Approval goes through a CLI or a fail-closed,
+  token-protected API (disabled in AWS) that the agent cannot call; a proposer can never approve their
+  own request. Approval is one transaction that re-validates the request, recounts the affected rows,
+  and marks it failed if the data changed since the proposal.
+- **Nothing irreversible, nothing unrecorded.** No `DELETE` or DDL (removal is a logical delete); invoices
+  and inventory movements are not writable, in policy and in grants; a database trigger records every
+  proposal and decision in an audit log that no application role can modify.
+- **Data is hostile input.** Text that looks like an instruction is returned verbatim and flagged,
+  never obeyed; profiles that send data to third parties refuse a database not marked as synthetic.
+
+Net effect: a compromised or misled model can, at worst, create pending requests that a person reviews.
+Each control is mapped to its evidence in the [threat model](docs/threat-model.md) (STRIDE, OWASP LLM Top 10).
+
+## Evidence
+
+- **Demo.** The recording above needs no model: `make demo` drives the real tools, rule engine,
+  detector, and approval flow, with an oracle in place of the model, in three acts: a defect trap,
+  blocked attacks, and a write that waits for a person.
+- **Tests and CI.** `make test` runs the whole suite, including the 45 attacks against the real
+  database. CI runs five independent jobs on every change (lint, tests, a model-free eval gate, AWS
+  stack assertions, and this README's quickstart as written) with no model, secret, or cloud account.
+  A test proves that disabling the SQL guard turns the gate red, and the docs themselves are tested.
+- **Results.** Five models, the same 80 questions, one run each. The block below is **generated** from
+  the stored run by `scripts/readme_results.py`, and a test fails if it drifts from the data.
 
 <!-- results:start -->
 
@@ -76,35 +102,29 @@ Ablations (ADR-013), also paired:
 
 <!-- results:end -->
 
-**Read this before quoting a number.** The 80 expected answers were reviewed by one person, their author, on
-2026-10-09, after the run and without changes, so this is not an independent benchmark;
-there is one run per model, so run-to-run noise is not in the intervals; the models were run at
-different times; and every timing comes from one laptop (see the footnote). The reading of what went wrong, in
-[`evals/notes/20261009.md`](evals/notes/20261009.md), matters more than the table.
+**Read this before quoting a number.** The 80 expected answers were reviewed only by their author,
+after the run and without changes, so this is not an independent benchmark. There is one run
+per model, so run-to-run noise is not captured; the models ran at different times; and every timing
+comes from one laptop. The analysis in [`evals/notes/20261009.md`](evals/notes/20261009.md) matters more than the table.
 
-## What I learned
-
-- **The commonest wrong answer was a shared reading, not noise.** Two unrelated models filtered to
-  "valid invoices" where the question asked for any record, and agreed with each other and not with
-  the reference. The verifier agreed with them too, and the detector did not flag them: its signals
-  fire when a rule is *violated*, and here the rule was *followed*.
-- **A bigger model answers more; it does not clearly err less.** Opus beats Haiku on the paired test
-  (15 cases against 2), but most of what it adds is questions Haiku declined to answer.
-- **A guardrail is one layer, and each layer can look better than it is.** It blocked 18 of 18
-  attacks and also a legitimate write request; the retrieval probe scored 20 of 20 and so would a
-  retriever that ignored the query.
-- **Measuring the system found bugs in the system.** The cost model exposed metrics that cost nearly
-  four times what the dashboard needed; the first deploy exposed a missing permission, and the agent
-  correctly refused to answer without its guardrail.
-- **Write down the test before you run it.** The levels, labels and metrics were fixed in ADRs before
-  the runs, which is why "Sonnet against Haiku, p = 0.049" is reported as *not* distinguishable.
+**Key findings.**
+- **The most common wrong answer was a shared misreading, not noise.** Two unrelated models filtered
+  to "valid invoices" where the question asked for any record; the verifier agreed with them, and the
+  detector did not flag them: its signals fire when a rule is *violated*, and here it was *followed*.
+- **A larger model answers more often; it does not clearly err less.** Opus beats Haiku on the paired
+  test (15 cases against 2), but most of the gain comes from questions Haiku declined to answer.
+- **Each layer can look better than it is.** The guardrail blocked 18 of 18 attacks but also a
+  legitimate write; the retrieval probe scored 20 of 20, as would a retriever that ignored the query.
+- **Measuring the system found bugs in it.** The cost model exposed metrics that cost nearly
+  four times what the dashboard needed; the first deployment exposed a missing permission.
+- **The analysis was preregistered.** Significance levels, labels, and metrics were fixed in ADRs
+  before the runs, which is why "Sonnet against Haiku, p = 0.049" is reported as *not* distinguishable.
 
 ## Run it in 5 commands
 
-Needs Docker, [`uv`](https://docs.astral.sh/uv/) and Python 3.12 (uv fetches it). No model, key or cloud
-account.
-On a clean clone it takes about two and a half minutes (134 s measured on 2026-10-09 on a MacBook Pro with
-an Apple M5 Max and 36 GB, with the Postgres image already downloaded; 222 s on a GitHub-hosted runner in CI).
+Requires Docker, [`uv`](https://docs.astral.sh/uv/), and Python 3.12 (uv fetches it); no model, key,
+or cloud account. A clean clone takes about two and a half minutes (134 s on 2026-10-09 on a MacBook
+Pro with an Apple M5 Max and 36 GB, with the Postgres image cached; 222 s on a GitHub-hosted runner).
 
 ```bash quickstart
 git clone https://github.com/mcorona/AI-projects-legacybridge.git && cd AI-projects-legacybridge
@@ -114,43 +134,35 @@ make demo       # the three acts above: a trap, attacks, a write that waits for 
 make test       # the whole suite, including the 45 attacks against the real database
 ```
 
-To ask a real question, give it a model. Copy the variables you need from `.env.example` (no
-credential belongs in a file), then:
+To ask a real question, pick a profile in [`config/models.yaml`](config/models.yaml), copy its variables
+from `.env.example` (credentials never belong in a file), and run `uv run legacybridge ask "<question>"
+--profile local-qwen`; proposed writes wait in `uv run legacybridge approvals list` for a person. The AWS
+deployment (`make deploy`, see [`docs/architecture/deployment-aws.md`](docs/architecture/deployment-aws.md))
+was deployed, measured, and destroyed, so nothing is running.
 
-```bash
-uv run legacybridge ask "¿Cuántos productos activos hay actualmente?" --profile local-qwen       # LM Studio on :1234
-uv run legacybridge ask "¿Cuántos productos activos hay actualmente?" --profile bedrock-claude    # after `aws login`
-uv run legacybridge approvals list                                                              # a person reviews writes
-```
+## Limitations
 
-Profiles are in [`config/models.yaml`](config/models.yaml). Deploying to AWS (`make deploy`) is
-described in [`docs/architecture/deployment-aws.md`](docs/architecture/deployment-aws.md); it was
-deployed, measured and destroyed, so nothing is running.
+- **Synthetic data only.** Production use on real data needs controls beyond this repository (threat model, *Out of scope*).
+- **Not an independent benchmark.** The cases, the reference SQL, and the expected answers were all
+  written and reviewed by one person, the author.
+- **Silent errors are reduced, not solved.** The plan's SWAR-rate target was not met (table above),
+  and the detector misses errors that follow a rule but misread the question.
+- **Small samples, moving targets, one tenant.** One run per model; free tiers change without notice;
+  one shared API token, with no per-user identity or quota.
+- **Narrow scope.** The 80 questions are 15 simple, 20 joins and aggregates, 20 traps, 10 ambiguous,
+  5 out of scope and 10 writes, all over the synthetic invoicing and inventory schemas.
 
-## Where to read next
+## Further reading
 
 | | |
 |---|---|
-| [`docs/architecture/`](docs/architecture/README.md) | Context, containers and the AWS deployment, as diagrams |
-| [`docs/adr/`](docs/adr/README.md) | The 14 decisions: what, why, what it costs, what was not chosen |
-| [`docs/threat-model.md`](docs/threat-model.md) | STRIDE by trust boundary and OWASP LLM Top 10 (2025), each control with its evidence |
-| [`docs/eval-report.md`](docs/eval-report.md) | The full evaluation: by category, by defect, detector, ablations |
-| [`docs/cost-model.md`](docs/cost-model.md) | Cost per question and per month at 100, 1,000 and 10,000 a day |
-| [`docs/measurement-environment.md`](docs/measurement-environment.md) | The machine, the network and the conditions behind every timing |
-| [`docs/swar-method.md`](docs/swar-method.md) | The idea behind the detector |
+| [`docs/architecture/`](docs/architecture/README.md) | Context, containers, and the AWS deployment, as diagrams |
+| [`docs/adr/`](docs/adr/README.md) | The 14 decisions: what, why, what it costs, and what was not chosen |
+| [`docs/threat-model.md`](docs/threat-model.md) | STRIDE and OWASP LLM Top 10 (2025), each control with its evidence |
+| [`docs/eval-report.md`](docs/eval-report.md) | The full evaluation: by category, by defect, detector, and ablations |
+| [`docs/cost-model.md`](docs/cost-model.md) | Cost per question and per month at 100, 1,000, and 10,000 a day |
+| [`docs/swar-method.md`](docs/swar-method.md) | The idea behind the SWAR detector |
 | [`docs/legacy-defects.md`](docs/legacy-defects.md) | The 28 planted defects of the two schemas |
-| [`CHANGELOG.md`](CHANGELOG.md) | What each phase added |
-
-## Status and limits
-
-- The data is **synthetic**. Using this on real customer data needs more than is here (see the
-  threat model's *Out of scope*).
-- The expected answers of the golden set were reviewed by a **person**, their author, who also wrote
-  the cases and the reference SQL. That makes them a reviewed reference, not an independent benchmark.
-- The plan's target for the SWAR rate was not reached (table above).
-- Free-tier models change under you; the results describe the model that answered that day.
-- The 80 questions are 15 simple, 20 joins and aggregates, 20 traps, 10 ambiguous, 5 out of scope and
-  10 writes, all over one synthetic invoicing and inventory schema.
 
 Its sibling, [Inventory Copilot](https://github.com/mcorona/AI-projects-inventory-copilot), asks
 whether you can trust what an agent *does*; LegacyBridge asks whether you can trust what it *says*.

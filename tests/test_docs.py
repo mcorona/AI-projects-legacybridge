@@ -190,3 +190,15 @@ def test_every_timing_in_the_results_table_is_explained_in_the_measurement_envir
             f"{value} is in the README table but not in docs/measurement-environment.md"
         )
     assert "Apple M5 Max" in doc and "Apple M5 Max" in README
+
+
+def test_the_safety_limits_the_readme_states_are_the_codes():
+    from legacybridge import policy
+
+    roles = (ROOT / "db" / "init" / "03_roles.sh").read_text(encoding="utf-8")
+    assert policy.MAX_AFFECTED == 100 and "more than 100 rows" in README
+    assert "ALTER ROLE lb_reader SET statement_timeout = '5s';" in roles
+    assert "ALTER ROLE lb_reader SET default_transaction_read_only = on;" in roles
+    assert "5 s statement timeout" in README
+    ci = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+    assert len(ci["jobs"]) == 5 and "five independent jobs" in README
